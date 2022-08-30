@@ -6,7 +6,7 @@ function optimizationCall()
     addpath('data', genpath('experimental data'));
     
     % Max number of evaluations per trial optimization algorithm will compute
-    setMaxEval  = 10000;
+    setMaxEval  = 10;
     
     % Choose range of experimental trials to fit (trial numbers start at 0)
     numStart    = 0;
@@ -15,7 +15,7 @@ function optimizationCall()
     % Choose blocks to loop through. The 11 acceptable subjects 
     % correspond to blocks 1-22. All blocks would be 1 to 28.
     blockStart  = 1;
-    blockEnd    = 22;
+    blockEnd    = 1;
 
     % Set range of additional duration values to simulate trials before trimming
     delayMin = 0;       % [sec]

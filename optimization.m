@@ -22,9 +22,9 @@
 % * Control structure
 %   ** Including vs. not including feedforward force term
 %
-% Note that NLopt() is a nested function within this function. NLopt sets
-% the optimization parameters and calls the optimization algorithm.
-% objFunc.m is the objective function which NLopt() calls repeatedly.
+% Note that NLopt(args) is a nested function within this function. NLopt
+% sets the optimization parameters and calls the optimization algorithm.
+% objFunc.m is the objective function which NLopt(args) calls repeatedly.
 %
 % This function calls external functions sysCreate.m, simInputShape.m, and
 % trimData.m. It also loads external files containing the experimental
@@ -38,13 +38,21 @@ function optimization(blockNum,optimizationType,modelStr,forwardF,timeMod,...
         ampMod,ver,impedance,simVersion,objective, weights,delayMin,delayMax,...
         plotInd,printDes,printSys,plotSim,plotPeaks,setMaxEval,numStart,...
         numEnd,fitMethod)
+
+% Set variable values (note that constants for gravity, physical system 
+% mass, and length are defined in globalData.m)
+Bmin        = 7;                                                            % Minimum damping value (N*s/m)
+Bmax        = 20;                                                           % Maximum damping value (N*s/m)
+Kmin        = 0;                                                            % Minimum  stiffness value (N/m)
+Kmax        = 250;                                                          % Maximum stiffness value (N/m)
+st          = 0.001;                                                        % Simulation time step (s)
+tDesMax     = 0;                                                            % Initialize maximum time duration
     
+% Run main program for selected experimental block and
+% simulation settings
 % Get information about experimental block
 [subjNum, subjStr, trialDate, trialStr, blockStr, ~, ~,invalidTrials] = ...
     blockDictionary(blockNum);
-
-% Run main program for selected experimental block and
-% simulation settings
 disp('Experimental Block: ')
 disp([subjStr,trialDate,trialStr,blockStr])
 
@@ -80,15 +88,6 @@ if plotInd
 end
 
 numTrials   = numEnd - numStart + 1;
-
-% Set variable values (note that constants for gravity, physical system 
-% mass, and length are defined in globalData.m)
-Bmin        = 7;                                                            % Minimum damping value (N*s/m)
-Bmax        = 20;                                                           % Maximum damping value (N*s/m)
-Kmin        = 0;                                                            % Minimum  stiffness value (N/m)
-Kmax        = 250;                                                          % Maximum stiffness value (N/m)
-st          = 0.001;                                                        % Simulation time step (s)
-tDesMax     = 0;                                                            % Initialize maximum time duration
 
 % Timing and amplitude error bounds for input shaping impulses:
 if timeMod == true
@@ -173,6 +172,10 @@ else
     figure('Name','Cart position','units','normalized','outerposition',[0 0 1 1]);
     cp = get(gcf,'Number');
 
+    % Set up data queue to fetch results during parallel optimization
+    D = parallel.pool.DataQueue;
+    D.afterEach(@(d) updateFigure(cp, d));
+
     figure('Name','Ball angle','units','normalized','outerposition',[0 0 1 1]);
     bp = get(gcf,'Number');
 
@@ -203,8 +206,9 @@ load(strcat("trim times/",blockStr),'Expression1')
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PARALLEL VERSION:
-function [algorithm, lb, ub, maxeval] = NLopt()
+% NLOPT FUNCTION
+function [algorithm, lb, ub, maxeval] = NLopt(tc,tdes,xEnd,vStart,vEnd,...
+        pendIndex,pos,vel,acc,theta,omega,alpha,num,cp,cv,ca,bp,bv,ba)
     
     % Choose optimization algorithm (uncomment desired algorithm)
     opt.algorithm = NLOPT_GN_CRS2_LM;                                       % Controlled Random Search (CRS) with local mutation
@@ -283,9 +287,10 @@ function [algorithm, lb, ub, maxeval] = NLopt()
 
     % Objective function to be minimized
     opt.min_objective = @(x) objFunc(x, optimizationType,ampMod,...
-        forwardF,ver,impedance,tc,tdes,delayMax,xEnd,vStart,vEnd,...
+        forwardF,ver,impedance,tc,tdes,delayMin,delayMax,xEnd,vStart,vEnd,...
         st,shift,simVersion,pendIndex,objective,pos,vel,...
-        acc,theta,omega,alpha,weights,blockStr,num,tDesMax,fitMethod);
+        acc,theta,omega,alpha,weights,blockStr,blockNum,subjNum,num,tDesMax,...
+        fitMethod);
 
     % Stopping criteria: stop optimization when an evaluation step
     % changes every component of x by less than xtol_rel multiplied by the
@@ -621,6 +626,9 @@ function [algorithm, lb, ub, maxeval] = NLopt()
     else
         
         % Cart position (pos): plot experimental versus simulation
+        posData = [plotRows, plotCols, num, numStart];
+        send(D, posData)
+
         set(groot,'CurrentFigure',cp);
         subplot(plotRows,plotCols,num-numStart+1)                               
         plot(te,pos,'LineWidth',2)
@@ -633,89 +641,91 @@ function [algorithm, lb, ub, maxeval] = NLopt()
         xlabel('t (s)')
         ylabel('cart position (m)')
 
-        % Ball angle (theta): plot experimental versus simulation
-        set(groot,'CurrentFigure',bp);
-        subplot(plotRows,plotCols,num-numStart+1)                               
-        plot(te,theta,'LineWidth',2)
-        hold on;
-        if plotSim
-            plot(tc,theta_sim,'LineWidth',2)
-        end
-        trial = num2str(num+1);
-        title(['Trial' ' ' trial]);
-        xlabel('t (s)')
-        ylabel('ball angle (deg)')
-
-        % Cart velocity (vel): plot experimental versus simulation
-        set(groot,'CurrentFigure',cv);
-        subplot(plotRows,plotCols,num-numStart+1)                               
-        plot(te,vel,'LineWidth',2)
-        hold on;
-        if plotSim && ~printDes
-            plot(tc,vel_sim,'LineWidth',2)
-%             if plotPeaks && (objective == "features")   % Plot simulated local velocity max & min
-            if plotPeaks   % Plot simulated local velocity max & min
-                plot(velChange_sim*st,velPeaks_sim,'Marker','s','MarkerSize',12,...
-               'Color','cyan','LineWidth',1.5,'LineStyle','none')
-            end
-        end
-        if plotPeaks && (objective == "features")   % Plot experimental local velocity max & min
-            plot(velChange_exp*st,velPeaks_exp,'Marker','s','MarkerSize',12,...
-               'Color','magenta','LineWidth',1.5,'LineStyle','none')
-        end
-        if printDes
-            % Plot individual input velocity submovements
-            [vcRows, vcCols] = size(vc);
-            td = 0:st:(vcCols-1)*st;
-            for row = 1:vcRows
-                plot(td,vc(row,:),'LineWidth',1.25,'Color',[0.9290, 0.6940, 0.1250])   
-            end
-            % Plot simulated output velocity
-            plot(tc, vel_sim, 'LineWidth', 2,'LineStyle','--','Color',[0.8500, 0.3250, 0.0980]);
-        end
-        trial = num2str(num+1);
-        title(['Trial' ' ' trial]);
-        xlabel('Time (s)')
-        ylabel('Cart Velocity (m/s)')
-
-        % Ball angular velocity (omega): plot experimental versus simulation
-        set(groot,'CurrentFigure',bv);
-        subplot(plotRows,plotCols,num-numStart+1)                               
-        plot(te,omega,'LineWidth',2)
-        hold on;
-        if plotSim
-            plot(tc,omega_sim,'LineWidth',2)
-        end
-        trial = num2str(num+1);
-        title(['Trial' ' ' trial]);
-        xlabel('t (s)')
-        ylabel('ball velocity (deg/s)')
-
-        % Cart acceleration (acc): plot experimental versus simulation
-        set(groot,'CurrentFigure',ca);
-        subplot(plotRows,plotCols,num-numStart+1)                               
-        plot(te,acc,'LineWidth',2)
-        hold on;
-        if plotSim
-            plot(tc,acc_sim,'LineWidth',2)
-        end
-        trial = num2str(num+1);
-        title(['Trial' ' ' trial]);
-        xlabel('t (s)')
-        ylabel('cart acceleration (m/s^2)')
-
-        % Ball acceleration (alpha): plot experimental versus simulation
-        set(groot,'CurrentFigure',ba);
-        subplot(plotRows,plotCols,num-numStart+1)                               
-        plot(te,alpha,'LineWidth',2)
-        hold on;
-        if plotSim
-            plot(tc,alpha_sim,'LineWidth',2)
-        end
-        trial = num2str(num+1);
-        title(['Trial' ' ' trial]);
-        xlabel('t (s)')
-        ylabel('ball acceleration (deg/s^2)')
+%         %%% Commented out while debugging parallel printing: %%%
+%         % Ball angle (theta): plot experimental versus simulation
+%         set(groot,'CurrentFigure',bp);
+%         subplot(plotRows,plotCols,num-numStart+1)                               
+%         plot(te,theta,'LineWidth',2)
+%         hold on;
+%         if plotSim
+%             plot(tc,theta_sim,'LineWidth',2)
+%         end
+%         trial = num2str(num+1);
+%         title(['Trial' ' ' trial]);
+%         xlabel('t (s)')
+%         ylabel('ball angle (deg)')
+% 
+%         % Cart velocity (vel): plot experimental versus simulation
+%         set(groot,'CurrentFigure',cv);
+%         subplot(plotRows,plotCols,num-numStart+1)                               
+%         plot(te,vel,'LineWidth',2)
+%         hold on;
+%         if plotSim && ~printDes
+%             plot(tc,vel_sim,'LineWidth',2)
+% %             if plotPeaks && (objective == "features")   % Plot simulated local velocity max & min
+%             if plotPeaks   % Plot simulated local velocity max & min
+%                 plot(velChange_sim*st,velPeaks_sim,'Marker','s','MarkerSize',12,...
+%                'Color','cyan','LineWidth',1.5,'LineStyle','none')
+%             end
+%         end
+%         if plotPeaks && (objective == "features")   % Plot experimental local velocity max & min
+%             plot(velChange_exp*st,velPeaks_exp,'Marker','s','MarkerSize',12,...
+%                'Color','magenta','LineWidth',1.5,'LineStyle','none')
+%         end
+%         if printDes
+%             % Plot individual input velocity submovements
+%             [vcRows, vcCols] = size(vc);
+%             td = 0:st:(vcCols-1)*st;
+%             for row = 1:vcRows
+%                 plot(td,vc(row,:),'LineWidth',1.25,'Color',[0.9290, 0.6940, 0.1250])   
+%             end
+%             % Plot simulated output velocity
+%             plot(tc, vel_sim, 'LineWidth', 2,'LineStyle','--','Color',[0.8500, 0.3250, 0.0980]);
+%         end
+%         trial = num2str(num+1);
+%         title(['Trial' ' ' trial]);
+%         xlabel('Time (s)')
+%         ylabel('Cart Velocity (m/s)')
+% 
+%         % Ball angular velocity (omega): plot experimental versus simulation
+%         set(groot,'CurrentFigure',bv);
+%         subplot(plotRows,plotCols,num-numStart+1)                               
+%         plot(te,omega,'LineWidth',2)
+%         hold on;
+%         if plotSim
+%             plot(tc,omega_sim,'LineWidth',2)
+%         end
+%         trial = num2str(num+1);
+%         title(['Trial' ' ' trial]);
+%         xlabel('t (s)')
+%         ylabel('ball velocity (deg/s)')
+% 
+%         % Cart acceleration (acc): plot experimental versus simulation
+%         set(groot,'CurrentFigure',ca);
+%         subplot(plotRows,plotCols,num-numStart+1)                               
+%         plot(te,acc,'LineWidth',2)
+%         hold on;
+%         if plotSim
+%             plot(tc,acc_sim,'LineWidth',2)
+%         end
+%         trial = num2str(num+1);
+%         title(['Trial' ' ' trial]);
+%         xlabel('t (s)')
+%         ylabel('cart acceleration (m/s^2)')
+% 
+%         % Ball acceleration (alpha): plot experimental versus simulation
+%         set(groot,'CurrentFigure',ba);
+%         subplot(plotRows,plotCols,num-numStart+1)                               
+%         plot(te,alpha,'LineWidth',2)
+%         hold on;
+%         if plotSim
+%             plot(tc,alpha_sim,'LineWidth',2)
+%         end
+%         trial = num2str(num+1);
+%         title(['Trial' ' ' trial]);
+%         xlabel('t (s)')
+%         ylabel('ball acceleration (deg/s^2)')
+% %%%   %%%
         
     end    
     
@@ -723,155 +733,156 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Function handle for parallel version:
-optHandle = @NLopt;
+NLoptHandle = @NLopt;
 
 % If the method is fitToAverage, first takes the average of all
 % experimental trials in a single block. Then uses this average experimental
 % trial as the single trial that the optimization algorithm fits to.
 if fitMethod == "fitToAverage"
     
-    stNorm = st;
+%     stNorm = st;
+%     
+%     % Initialize variables for longest & shortest durations of group
+%     longestDuration = 0;
+%     shortestDuration = 100;
+%     for num = numStart:numEnd
+%         numStr = num2str(num);
+%         
+%         % Construct file name and load file of one experimental trial
+%         fileStr = strcat(subjStr,trialDate,trialStr,numStr);
+%         load(fileStr,'pos','theta','vel','omega','acc','alpha','t')
+%         
+%         % Load start and stop indices of corresponding trial. Note that
+%         % trials names are indexed from 0, so add 1 to access correct row
+%         % in array
+%         start   = Expression1(num+1,1);
+%         stop    = Expression1(num+1,2);
+%         
+%         % DEBUG
+% %         disp('Trial #:')
+% %         disp('Trial duration (pre-computation):')
+%         duration = t(stop)-t(start);
+%         if duration > longestDuration
+%            longestDuration = duration;
+%         end
+%         
+%         if duration < shortestDuration
+%             shortestDuration = duration;
+%         end
+%     end
+%     
+%     longestDuration = round(longestDuration,-log10(st));
+% %     shortestDuration
+%     normLen = int16(longestDuration/stNorm);
+%     
+%     % Initialize arrays to hold all experimental data
+%     posArray    = zeros(numTrials,normLen);
+%     thetaArray  = zeros(numTrials,normLen);
+%     velArray    = zeros(numTrials,normLen);
+%     omegaArray  = zeros(numTrials,normLen);
+%     accArray    = zeros(numTrials,normLen);
+%     alphaArray  = zeros(numTrials,normLen);
+%     tdesArray   = zeros(numTrials,1);
+%     
+%     % Take average of selected range of experimental trials
+%     for num = numStart:numEnd
+%         numStr = num2str(num);
+%         arrayNum = num-numStart+1;
+% 
+%         % Skip invalid trials
+%         if ismember(num,invalidTrials)
+%             continue
+%         end
+%     
+%         % Construct file name and load file of one experimental trial
+%         fileStr = strcat(subjStr,trialDate,trialStr,numStr);
+%         load(fileStr,'pos','theta','vel','omega','acc','alpha','t')
+% 
+%         % Load start index of corresponding trial. Note that trials are
+%         % indexed from 0 so add 1 to access correct row in array
+%         start   = Expression1(num+1,1);
+% 
+%         % Trim experimental data at point where duration first exceeds
+%         % longest trial duration. Function also evenly spaces data
+%         % according to chosen time step.
+%         stop = find(t > longestDuration + t(start),1);
+%         if isempty(stop)
+%             stop = length(t);
+%         end
+%         [pos,theta,vel,omega,acc,alpha,tdes,tc] = trimData(pos,theta,vel,...
+%             omega,acc,alpha,t,st,start,stop);
+% 
+%         % Convert angles back to radians and position back to -0.125
+%         theta = theta*(2*pi)/360;
+%         omega = omega*(2*pi)/360;
+%         alpha = alpha*(2*pi)/360;
+%         pos = pos - 0.125;
+% 
+%         % Trim data again, this time to the exact longest duration
+%         start = 1;
+%         stop = int16(longestDuration/st);
+%         
+%         [pos,theta,vel,omega,acc,alpha,tdes,tc] = trimData(pos,theta,vel,...
+%             omega,acc,alpha,tc,st,start,stop);
+%         
+%         % Add normalized profiles to arrays with all trials from group
+%         % being averaged
+%         posArray(arrayNum,:)      = pos;
+%         thetaArray(arrayNum,:)    = theta;
+%         velArray(arrayNum,:)      = vel;
+%         omegaArray(arrayNum,:)    = omega;
+%         accArray(arrayNum,:)      = acc;
+%         alphaArray(arrayNum,:)    = alpha;
+%         tdesArray(arrayNum,:)     = tdes;
+%         
+%     end
+%     
+%     % Delete skipped trials from arrays. Filter them out by finding the
+%     % trials whose final position is 0.
+%     [zeroRow, ~] = find(~posArray(:,end));
+%     posArray(zeroRow,:)     = [];
+% %     thetaArray(zeroRow,:)   = [];
+%     velArray(zeroRow,:)     = [];
+% %     omegaArray(zeroRow,:)   = [];
+% %     accArray(zeroRow,:)     = [];
+% %     alphaArray(zeroRow,:)   = [];
+%     
+%     % Take average of all trials
+%     posAvg      = mean(posArray);
+% %     thetaAvg    = mean(thetaArray);
+%     velAvg      = mean(velArray);
+% %     omegaAvg    = mean(omegaArray);
+% %     accAvg      = mean(accArray);
+% %     alphaAvg    = mean(alphaArray);
+% 
+%     % Define cart end position, start and end velocities, and pendulum
+%     % release time from experimental data
+%     xEnd        = posAvg(end);
+%     vStart      = velAvg(1);
+%     vEnd        = velAvg(end);
+%     pendIndex   = find(velAvg > 0.1, 1);                                    % The first time index that cart velocity surpasses 0.1 m/s
+% 
+%     % Extend time vector to maximum delayed size. All time vectors will
+%     % be the same length, but shorter time durations will be padded.
+%     % DEBUG
+% %     disp('Minimum time duration:')
+%     tdes = shortestDuration;
+% %     disp('tdes max:')
+%     tDesMax = tdes + delayMax;
+%     tc = 0:stNorm:tDesMax;
+% 
+%     % Initialize variables shared by objFunc.m objective function
+%     G = globalData('evalCount', 0);
+%     evalCount = G.evalCount;
+% 
+%     %%%%% Run optimization. Fit values to selected experimental trial. %%%%
+%     [algorithm, lb, ub, maxeval] = NLopt();
+% 
+%     % Print trial number and total evaluation count
+%     disp(['Trial: ',num2str(num)])
+%     disp(['Number of evaluations: ', num2str(evalCount)])
     
-    % Initialize variables for longest & shortest durations of group
-    longestDuration = 0;
-    shortestDuration = 100;
-    for num = numStart:numEnd
-        numStr = num2str(num);
-        
-        % Construct file name and load file of one experimental trial
-        fileStr = strcat(subjStr,trialDate,trialStr,numStr);
-        load(fileStr,'pos','theta','vel','omega','acc','alpha','t')
-        
-        % Load start and stop indices of corresponding trial. Note that
-        % trials names are indexed from 0, so add 1 to access correct row
-        % in array
-        start   = Expression1(num+1,1);
-        stop    = Expression1(num+1,2);
-        
-        % DEBUG
-%         disp('Trial #:')
-%         disp('Trial duration (pre-computation):')
-        duration = t(stop)-t(start);
-        if duration > longestDuration
-           longestDuration = duration;
-        end
-        
-        if duration < shortestDuration
-            shortestDuration = duration;
-        end
-    end
-    
-    longestDuration = round(longestDuration,-log10(st));
-%     shortestDuration
-    normLen = int16(longestDuration/stNorm);
-    
-    % Initialize arrays to hold all experimental data
-    posArray    = zeros(numTrials,normLen);
-    thetaArray  = zeros(numTrials,normLen);
-    velArray    = zeros(numTrials,normLen);
-    omegaArray  = zeros(numTrials,normLen);
-    accArray    = zeros(numTrials,normLen);
-    alphaArray  = zeros(numTrials,normLen);
-    tdesArray   = zeros(numTrials,1);
-    
-    % Take average of selected range of experimental trials
-    for num = numStart:numEnd
-        numStr = num2str(num);
-        arrayNum = num-numStart+1;
-
-        % Skip invalid trials
-        if ismember(num,invalidTrials)
-            continue
-        end
-    
-        % Construct file name and load file of one experimental trial
-        fileStr = strcat(subjStr,trialDate,trialStr,numStr);
-        load(fileStr,'pos','theta','vel','omega','acc','alpha','t')
-
-        % Load start index of corresponding trial. Note that trials are
-        % indexed from 0 so add 1 to access correct row in array
-        start   = Expression1(num+1,1);
-
-        % Trim experimental data at point where duration first exceeds
-        % longest trial duration. Function also evenly spaces data
-        % according to chosen time step.
-        stop = find(t > longestDuration + t(start),1);
-        if isempty(stop)
-            stop = length(t);
-        end
-        [pos,theta,vel,omega,acc,alpha,tdes,tc] = trimData(pos,theta,vel,...
-            omega,acc,alpha,t,st,start,stop);
-
-        % Convert angles back to radians and position back to -0.125
-        theta = theta*(2*pi)/360;
-        omega = omega*(2*pi)/360;
-        alpha = alpha*(2*pi)/360;
-        pos = pos - 0.125;
-
-        % Trim data again, this time to the exact longest duration
-        start = 1;
-        stop = int16(longestDuration/st);
-        
-        [pos,theta,vel,omega,acc,alpha,tdes,tc] = trimData(pos,theta,vel,...
-            omega,acc,alpha,tc,st,start,stop);
-        
-        % Add normalized profiles to arrays with all trials from group
-        % being averaged
-        posArray(arrayNum,:)      = pos;
-        thetaArray(arrayNum,:)    = theta;
-        velArray(arrayNum,:)      = vel;
-        omegaArray(arrayNum,:)    = omega;
-        accArray(arrayNum,:)      = acc;
-        alphaArray(arrayNum,:)    = alpha;
-        tdesArray(arrayNum,:)     = tdes;
-        
-    end
-    
-    % Delete skipped trials from arrays. Filter them out by finding the
-    % trials whose final position is 0.
-    [zeroRow, ~] = find(~posArray(:,end));
-    posArray(zeroRow,:)     = [];
-%     thetaArray(zeroRow,:)   = [];
-    velArray(zeroRow,:)     = [];
-%     omegaArray(zeroRow,:)   = [];
-%     accArray(zeroRow,:)     = [];
-%     alphaArray(zeroRow,:)   = [];
-    
-    % Take average of all trials
-    posAvg      = mean(posArray);
-%     thetaAvg    = mean(thetaArray);
-    velAvg      = mean(velArray);
-%     omegaAvg    = mean(omegaArray);
-%     accAvg      = mean(accArray);
-%     alphaAvg    = mean(alphaArray);
-
-    % Define cart end position, start and end velocities, and pendulum
-    % release time from experimental data
-    xEnd        = posAvg(end);
-    vStart      = velAvg(1);
-    vEnd        = velAvg(end);
-    pendIndex   = find(velAvg > 0.1, 1);                                    % The first time index that cart velocity surpasses 0.1 m/s
-
-    % Extend time vector to maximum delayed size. All time vectors will
-    % be the same length, but shorter time durations will be padded.
-    % DEBUG
-%     disp('Minimum time duration:')
-    tdes = shortestDuration;
-%     disp('tdes max:')
-    tDesMax = tdes + delayMax;
-    tc = 0:stNorm:tDesMax;
-
-    % Initialize variables shared by objFunc.m objective function
-    G = globalData('evalCount', 0);
-    evalCount = G.evalCount;
-
-    %%%%% Run optimization. Fit values to selected experimental trial. %%%%
-    [algorithm, lb, ub, maxeval] = NLopt();
-
-    % Print trial number and total evaluation count
-    disp(['Trial: ',num2str(num)])
-    disp(['Number of evaluations: ', num2str(evalCount)])
-    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Starting here is the standard method of finding a best-fit simulated
 % trial for each individual experimental trial.
 else
@@ -922,7 +933,8 @@ else
 
         %%% Run optimization. Fit values to selected experimental trial. %%%
         % Parallel version:
-        [algorithm, ~, ~, maxeval] = feval(optHandle);
+        [algorithm, ~, ~, maxeval] = feval(NLoptHandle,tc,tdes,xEnd,vStart,...
+            vEnd,pendIndex,pos,vel,acc,theta,omega,alpha,num,cp,cv,ca,bp,bv,ba);
 
         % Print trial number and total evaluation count
         disp(['Trial: ',num2str(num)])

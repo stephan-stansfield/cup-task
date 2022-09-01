@@ -93,7 +93,7 @@ fitMethod = "eachTrial";
 
 % If running multiple iterations in a row, can use counter and if
 % statements to designate desired parameters.
-for setting = 1
+for setting = 0
     
     if setting == 1
         % 1. Original input shaping

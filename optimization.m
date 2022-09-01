@@ -57,6 +57,8 @@ tDesMax     = 0;                                                            % In
 %     algorithm = NLOPT_GN_ISRES;                                         % ISRES (Improved Stochastic Ranking Evolution Strategy)
 %     algorithm = NLOPT_GN_ESCH;                                          % ESCH (evolutionary algorithm)
     
+% Run main program for selected experimental block and
+% simulation settings
 % Get information about experimental block
 [subjNum, subjStr, trialDate, trialStr, blockStr, ~, ~,invalidTrials] = ...
     blockDictionary(blockNum);
@@ -215,19 +217,19 @@ mkdir(folderStr, "best-fit profiles");
 % Load start and stop indices of trials for this block
 load(strcat("trim times/",blockStr),'Expression1')
 
-% Function handle for parallel version:
-NLoptHandle = @NLopt;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Set optimization parameters
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Initialize array to hold optimization parameters for each trial
-opt_array = cell(50,1);
-
-% Initialize array to hold best-fit parameters
+% Initialize arrays to hold best-fit results after optimization
 xopt_array = cell(50,2);
 
-for num = numStart:numEnd
+% Initialize stopping tolerance
+relative_stop = 0.00001;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% NLOPT FUNCTION
+    function [xopt, fmin] = NLopt(tc, tdes,xEnd,vStart,vEnd,pendIndex,...
+            pos,vel,acc,theta,omega,alpha,num,cp,cv,ca,bp,bv,ba,algorithm,setMaxEval)
+% function NLopt(tc, tdes,xEnd,vStart,vEnd,pendIndex,pos,vel,acc,theta,omega,...
+%         alpha,num,cp,cv,ca,bp,bv,ba,algorithm,setMaxEval)
+    
     % Set optimization algorithm
     opt.algorithm = algorithm;
     
@@ -250,7 +252,7 @@ for num = numStart:numEnd
             % Initial guess: b=10, k=100, no timing or amplitude execution error
             init_guess = [bInit, kInit, 2, 2, 2, 2, tdelayInit];    
         end
-    
+
     elseif optimizationType == "input shaping 2 impulse impedance"
         
         % Parameter array: [b, k, p, q, tdelay, fa1, fa2]
@@ -296,31 +298,45 @@ for num = numStart:numEnd
         % Parameter array: [b, k, D1, tf1, ti2, tdelay]
         init_guess = [bInit, kInit, xEnd/2, tdes/2, tdes/2, tdelayInit];
     end
-    
+
     % Objective function to be minimized
     opt.min_objective = @(x) objFunc(x, optimizationType,ampMod,...
         forwardF,ver,impedance,tc,tdes,delayMin,delayMax,xEnd,vStart,vEnd,...
         st,shift,simVersion,pendIndex,objective,pos,vel,...
         acc,theta,omega,alpha,weights,blockStr,blockNum,subjNum,num,tDesMax,...
         fitMethod);
-    
+
     % Stopping criteria: stop optimization when an evaluation step
     % changes every component of x by less than xtol_rel multiplied by the
     % absolute value of that component of x (e.g., xtol_rel = .01 means the
     % optimization will stop when a step changes all parameters by less
     % than 1%)
-    relative_stop = 0.00001;
     opt.xtol_rel = relative_stop;
-    
+
     % Maximum number of evaluations before stopping the algorithm
     opt.maxeval = setMaxEval;
-    
+
     % DEBUG: try setting verbose output
     opt.verbose = 1;
 
-    opt_array{num+1} = opt;
+    % Run NLopt algorithm
+    % @xopt: optimal values of the optimization hyperparameters
+    % @fmin: minimum objective function value
+    [xopt, fmin, ~] = nlopt_optimize(opt, init_guess);
+    
+%     G = globalData();
+%     evals = G.evalCount;
+
+%     % DEBUG
+%     disp(evals)
+% 
+%     evalNum = evals(num+1);
 
 end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Function handle for parallel version:
+NLoptHandle = @NLopt;
 
 % If the method is fitToAverage, first takes the average of all
 % experimental trials in a single block. Then uses this average experimental
@@ -444,12 +460,7 @@ if fitMethod == "fitToAverage"
 % 
 %     % Define cart end position, start and end velocities, and pendulum
 %     % release time from experimental data
-%     xEnd        = posAvg(end); num+1;
-    %     if fitMethod == "fitToAverage"
-    %         returnrow = 1;
-    %         trial = NaN; 
-    %     end
-    
+%     xEnd        = posAvg(end);
 %     vStart      = velAvg(1);
 %     vEnd        = velAvg(end);
 %     pendIndex   = find(velAvg > 0.1, 1);                                    % The first time index that cart velocity surpasses 0.1 m/s
@@ -496,6 +507,7 @@ else
         acc = structTrial.acc;
         alpha = structTrial.alpha;
         t = structTrial.t;
+        
 
         % Load start and stop indices of corresponding trial. Note that trials
         % are indexed from 0, so add 1 to access correct row in array.
@@ -518,514 +530,548 @@ else
         tDesMax = tdes + delayMax;
         tc=0:st:tDesMax;
 
-        opt = opt_array{num+1};
+        %%% Run optimization. Fit values to selected experimental trial. %%%
+        % Parallel version:
+        [xopt, fmin] = feval(NLoptHandle,tc,tdes,xEnd,vStart,vEnd,...
+            pendIndex,pos,vel,acc,theta,omega,alpha,num,cp,cv,ca,bp,bv,...
+            ba,algorithm,setMaxEval);
+%         feval(NLoptHandle,tc,tdes,xEnd,vStart,vEnd,pendIndex,pos,vel,acc,...
+%             theta,omega,alpha,num,cp,cv,ca,bp,bv,ba,algorithm,setMaxEval,returnArray);
 
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % Run optimization. Fit values to selected experimental trial. %%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % Run NLopt algorithm
-        % @xopt: optimal values of the optimization hyperparameters
-        % @fmin: minimum objective function value
-        [xopt, fmin, ~] = nlopt_optimize(opt, init_guess);
-
-        % Store best-fit parameters in an array
-        xopt_array(num+1,:) = [xopt, fmin];
-
-    end
-
-    % Now re-simulate trials using best-fit parameters found by
-    % optimization, plot, and save
-    for num = numStart:numEnd
-
-        xopt = xopt_array(num+1,:)
-        
-        %     G = globalData();
-        %     evals = G.evalCount;
-        
-        %     % DEBUG
-        %     disp(evals)
-        % 
-        %     evalNum = evals(num+1);
-            
-        % Extract best-fit parameters from optimization output
-        optB = xopt(1);
-        optK = xopt(2);
-        if optimizationType == "input shaping 4 impulse"
-            optP        = xopt(3);
-            optQ        = xopt(4);
-            optR        = xopt(5);
-            optS        = xopt(6);
-            optTcount   = xopt(7);
-            
-            if ampMod == true
-                optA11  = xopt(8);
-                optA12  = xopt(9);
-                optA21  = xopt(10);
-                optA22  = xopt(11);
-            else
-                optA11  = 1;
-                optA12  = 1;
-                optA21  = 1;
-                optA22  = 1;
-            end
-            
-        elseif optimizationType == "input shaping 2 impulse impedance"
-            optP        = xopt(3);
-            optQ        = xopt(4);
-            optTcount   = xopt(5);
-            
-            if ampMod == true
-                optA1   = xopt(6);
-                optA2   = xopt(7);
-            else
-                optA1   = 1;
-                optA2   = 1;
-            end
-        elseif optimizationType == "input shaping 2 impulse no impedance"
-            optP        = xopt(1);                                              
-            optQ        = xopt(2);
-            optTcount   = xopt(3);
-            
-            if ampMod == true
-                optA1   = xopt(4);
-                optA2   = xopt(5);
-            else
-                optA1   = 1;
-                optA2   = 1;
-            end
-        elseif optimizationType == "submovement"
-            optD        = xopt(3);
-            optt1       = xopt(4);
-            optt2       = xopt(5);
-            optTcount   = xopt(6);
-        end
-            
-        % Translate optimization time parameters to actual times in seconds
-    %     optTdelay   = 0.5*(optTcount-1)*delayMax;
-        optTdelay   = (optTcount-2)*delayMax;
-        tdessim     = tdes + optTdelay;
-        if optimizationType == "input shaping 4 impulse"
-            optShift    = shift*[optP-2,optQ-2,optR-2,optS-2];
-        elseif optimizationType == "input shaping 2 impulse impedance" ||...
-                optimizationType == "input shaping 2 impulse no impedance"
-            optShift    = shift*[optP-2,optQ-2];
-        end
-        
-        % Create system using optimal hyperparameters
-        [sys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
-            sysCreate(optB,optK,forwardF,ver,impedance,printSys);
-    
-        if printSys
-            % Output damping ratios and damped natural periods
-            optB
-            optK
-            zeta1
-            zeta2
-            Td1
-            Td2
-        end    
-    
-        % Simulate system with optimized parameters
-        if optimizationType == "input shaping 4 impulse"
-            modes = 2;
-            [output,vc,sub1End,sub2Start,dur_corr] = simInputShape(optB,optK,sys,...
-                sysRigid,Td1,Td2,zeta1,zeta2,tdes,tdessim,xEnd,vStart,vEnd,...
-                optA11,optA12,optA21,optA22,optP,optQ,optR,optS,st,shift,...
-                forwardF,simVersion,modes,pendIndex,fitMethod);
-            
-        elseif optimizationType == "input shaping 2 impulse impedance" || ...
-                optimizationType == "input shaping 2 impulse no impedance"
-            
-            modes   = 1;
-            Td2     = 0;
-            zeta2   = 0;
-            fa21    = 0;
-            fa22    = 0;
-            r       = 0;
-            s       = 0;
-            [output,vc,sub1End,sub2Start,dur_corr] = simInputShape(optB,optK,sys,...
-                sysRigid,Td,Td2,zeta,zeta2,tdes,tdessim,xEnd,vStart,vEnd,...
-                optA1,optA2,fa21,fa22,optP,optQ,r,s,st,shift,forwardF,...
-                simVersion,modes,pendIndex,fitMethod);
-    
-        elseif optimizationType == "submovement"
-            [output, vc] = simSubmovements(sys,sysRigid,tdes,tdessim,st,xEnd,vStart,...
-                optD,optt1,optt2,pendIndex,simVersion,forwardF,impedance);
-        end
-        
-    %         % If using feature-based objective function, find location of simulated
-    %         % peaks
-    %         if objective == "features"
-    %            objCalc(objective,output,pos,theta,vel,omega,acc,alpha,weights,...
-    %                blockStr,blockNum,subjNum,num);
-    %            G = globalData();
-    %            velChange_exp = G.velChange_exp;
-    %            velPeaks_exp = G.velPeaks_exp;
-    %            velChange_sim = G.velChange_sim;
-    %            velPeaks_sim = G.velPeaks_sim;
-    %     
-    %            % SAVEPEAKS
-    %            % Add peaks to cell array
-    %     %        peakArray{num+1,1} = [velChange_exp; velPeaks_exp];
-    %     
-    %         % If just plotting peaks, without using for objective function
-    %         elseif plotPeaks
-        if plotPeaks
-            vel_sim = output(:,3);
-            acc_sim = output(:,5); 
-            [velChange_sim, velPeaks_sim] = peakCalc(vel_sim, acc_sim);
-        end
-        
-        % Rename outputs for ease of use
-        pos_sim     = output(:,1);
-        theta_sim   = output(:,2);
-        vel_sim     = output(:,3);
-        omega_sim   = output(:,4);
-        acc_sim     = output(:,5);
-        alpha_sim   = output(:,6);
-        
-        % Handle any size difference due to rounding error
-        lensim = length(vel_sim);
-        lenexp = length(pos);
-        lentc  = length(tc);
-        
-        if lensim ~= lenexp
-            smaller = min(lensim,lenexp);
-    
-            % To calculate RMSE only during times when both profiles are
-            % defined, shorten the longer array to the shorter one's length
-            if lensim > lenexp
-                vel_sim_RMSE    = vel_sim(1:smaller);
-                vel_RMSE        = vel;
-            else
-                vel_RMSE        = vel(1:smaller);
-                vel_sim_RMSE    = vel_sim;
-            end
-            
-        else
-            vel_RMSE            = vel;
-            vel_sim_RMSE        = vel_sim;
-        end
-        
-        % Make time vector same length as simulated data
-        if lensim ~= lentc
-            tc = 0:st:(lensim-1)*st;
-        end
-        
-        % Calculate cart velocity RMSE
-        dvel        = vel_sim_RMSE - vel_RMSE';
-        dvel        = dvel/max(vel);
-        squareVel   = dvel.^2;
-        vrmse       = sqrt((1/length(squareVel))*sum(squareVel));
-        
-    %     % Insert trial number, fmin and optimized parameter values into array
-    %     returnrow = num-numStart+1;
-    %     trial =
-    %     % DEBUG
-    %     disp('Size of evals: ')
-    %     disp(size(evals))
-    
-    %     if optimizationType == "input shaping 4 impulse"
-    %         returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK,...
-    %             optShift,optTdelay, optA11, optA12, optA21, optA11, sub1End,...
-    %             sub2Start, evals(num+1), opt.xtol_rel];
-    %     elseif optimizationType == "input shaping 2 impulse impedance"
-    %         returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK,...
-    %             optShift, optTdelay, optA1, optA2, sub1End, sub2Start,...
-    %             evals(num+1), opt.xtol_rel];
-    %     elseif optimizationType == "input shaping 2 impulse no impedance"
-    %         returnArray(returnrow,:) = [trial, fmin, vrmse, optShift,...
-    %             optTdelay, optA1, optA2, sub1End, sub2Start, evals(num+1),...
-    %             opt.xtol_rel];
-    %     elseif optimizationType == "submovement"
-    %         returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK, optD,...
-    %             optt1, optt2, optTdelay, evals(num+1), opt.xtol_rel];
-    %     end
-        
-        % Save best-fit output to a spreadsheet    
-        dur_corr_vector = zeros(length(vel_sim),1);
-        dur_corr_vector(1) = dur_corr;
-        outputArray = [tc', pos_sim, theta_sim, vel_sim, omega_sim, acc_sim, alpha_sim, dur_corr_vector];
-        profileVariables = {'Time [s]', 'Cart Pos [m]', 'Ball Angle [deg]',...
-            'Cart Vel [m/s]','Ball Ang Vel [deg/s]', 'Cart Acc [m/s^2]',...
-            'Ball Ang Acc [deg/s^2]', 'Pre-Trim Duration [s]'};
-        ProfileT = array2table(outputArray,'VariableNames',profileVariables);
-        trialNumStr = num2str(returnrow);
-        fileName = strcat(folderStr, "/best-fit profiles/", trialNumStr, ".xlsx");
-        writetable(ProfileT,fileName);
-        
-        %%%% Check if "best" solution is actually one of filtered cases
-        % If cart velocity solution is ~0 velocity
-        if mean(vel_sim)<0.1      
-            disp('Chosen trajectory is 0 velocity');
-    
-        % If cart velocity exceeds saturation limit
-        elseif max(vel_sim) > 0.5
-            disp('Chosen trajectory over max velocity');
-    
-        % If cart velocity exceeds saturation minimum
-        elseif min(vel_sim) < -0.075
-            disp('Chosen trajectory under min velocity');
-    
-        % If ball angle exceeds saturation limit
-        elseif max(theta_sim) > 50
-            disp('Chosen trajectory over max ball angle');
-    
-        % If ball angular velocity exceeds saturation limit
-        elseif max(omega_sim) > 75
-            disp('chosen trajectory over max ball velocity');
-    
-        % If cart acceleration exceeds saturation limit
-        elseif max(acc_sim) > 5
-            disp('Chosen trajectory over max cart acceleration');
-            %{
-        % If ball acceleration exceeds saturation limit
-        elseif max(alpha_sim) > 15
-            disp('Chosen trajectory over max ball acceleration')
-            %}
-        end
-        
-        % Define time vector for experimental profile
-        te = 0:st:(lenexp-1)*st;
-        
-        % Subplot current trial in large figure window with multiple trials
-        if plotInd
-            % Plot Individual Velocity Trajectory
-            labelFontSize = 24;
-            titleFontSize = 28;
-            axisFontSize = 16;
-            lineWidth = 3;
-            colGreen = [0, 153, 51]/255;
-            colOrange = [255, 153, 0]/255;
-            colBlue = [0, 102, 255]/255;
-            colGrey = [153, 153, 153]/255;
-            colDarkGrey = [51, 51, 51]/255;
-            defaultBlue = [0, 0.4470, 0.7410];
-            defaultOrange = [0.8500, 0.3250, 0.0980];
-    
-            % For characteristic trials:
-            % Cart velocity (vel): plot experimental versus simulation
-            set(groot,'CurrentFigure',cv);
-            plot(te,vel,'LineWidth',lineWidth,'Color',defaultBlue)
-            hold on;
-            if plotSim      % Plot simulated profile
-                plot(tc,vel_sim,'LineWidth',lineWidth,'Color',defaultOrange)
-            end
-            if plotPeaks   % Plot local velocity max & min
-               plot(velChange_exp*st,velPeaks_exp,'Marker','*','MarkerSize',12,...
-                   'Color','magenta','LineWidth',2,'LineStyle','none')
-            end
-            set(gca,'FontSize',axisFontSize)
-            xlabel('Time (s)','FontSize',labelFontSize)
-            ylabel('Cart Velocity (m/s)','FontSize',labelFontSize)
-            subjNum = erase(subjNum,'S');
-            if fitMethod ~= "fitToAverage"
-                title(['Subject ', subjNum, ', Block ', block3or4 ', Trial ',...
-                    num2str(trialNumber)],'FontSize',titleFontSize);
-            end
-            
-            % For flow diagram: simulated cart velocity only
-            %{
-            labelFontSize = 18;
-            titleFontSize = 20;
-            axisFontSize = 16;
-            lineWidth = 2;
-            
-            figure();
-            plot(tc,vel_sim,'LineWidth',lineWidth,'Color',defaultOrange)
-            set(gca,'FontSize',axisFontSize)
-            xlabel('Time (s)','FontSize',labelFontSize)
-            ylabel('Cart Velocity (m/s)','FontSize',labelFontSize)
-            title('Output Cart Velocity', 'FontSize',titleFontSize)
-            
-            % Trim simulated profile
-            if length(vel_sim) > length(vel)
-                vel_sim     = vel_sim(1:length(vel));
-                tc          = tc(1:length(vel));
-            end
-            
-            % For flow diagram: both simulated & experimental cart velocity
-            figure();
-            plot(te,vel,'LineWidth',lineWidth,'Color',defaultBlue)
-            hold on;
-            plot(tc,vel_sim,'LineWidth',lineWidth,'Color',defaultOrange)
-            set(gca,'FontSize',axisFontSize)
-            xlabel('Time (s)','FontSize',labelFontSize)
-            ylabel('Cart Velocity (m/s)','FontSize',labelFontSize)
-            title('Experimental and Simulated Cart Velocities','FontSize',titleFontSize)
-            %}
-            
-        else
-            
-            % Before sending data to plot, make sure all arrays are row vectors
-            sz_te = size(te);
-            sz_tc = size(tc);
-            sz_pos = size(pos);
-            sz_pos_sim = size(pos_sim);
-    
-            if sz_te(1) ~= 1
-                te = te';
-            end
-    
-            if sz_tc(1) ~= 1
-                tc = tc';
-            end
-    
-            if sz_pos(1) ~=1
-                pos = pos';
-                % ADD OTHER VARIABLES HERE ONCE IT WORKS FOR POS
-            end
-            
-            if sz_pos_sim(1) ~= 1
-                pos_sim = pos_sim';
-            end
-    
-            % Cart position (pos): plot experimental versus simulation
-            posData = cat(2, plotRows, plotCols, num, numStart, length(te), length(tc), te, pos, tc, pos_sim);
-            send(D, posData)
-    
-            set(groot,'CurrentFigure',cp);
-            subplot(plotRows,plotCols,num-numStart+1)                               
-            plot(te,pos,'LineWidth',2)
-            hold on;
-            if plotSim
-                plot(tc,pos_sim,'LineWidth',2)
-            end
-            trial = num2str(num+1);
-            title(['Trial' ' ' trial]);
-            xlabel('t (s)')
-            ylabel('cart position (m)')
-    
-    %         %%% Commented out while debugging parallel printing: %%%
-    %         % Ball angle (theta): plot experimental versus simulation
-    %         set(groot,'CurrentFigure',bp);
-    %         subplot(plotRows,plotCols,num-numStart+1)                               
-    %         plot(te,theta,'LineWidth',2)
-    %         hold on;
-    %         if plotSim
-    %             plot(tc,theta_sim,'LineWidth',2)
-    %         end
-    %         trial = num2str(num+1);
-    %         title(['Trial' ' ' trial]);
-    %         xlabel('t (s)')
-    %         ylabel('ball angle (deg)')
-    % 
-    %         % Cart velocity (vel): plot experimental versus simulation
-    %         set(groot,'CurrentFigure',cv);
-    %         subplot(plotRows,plotCols,num-numStart+1)                               
-    %         plot(te,vel,'LineWidth',2)
-    %         hold on;
-    %         if plotSim && ~printDes
-    %             plot(tc,vel_sim,'LineWidth',2)
-    % %             if plotPeaks && (objective == "features")   % Plot simulated local velocity max & min
-    %             if plotPeaks   % Plot simulated local velocity max & min
-    %                 plot(velChange_sim*st,velPeaks_sim,'Marker','s','MarkerSize',12,...
-    %                'Color','cyan','LineWidth',1.5,'LineStyle','none')
-    %             end
-    %         end
-    %         if plotPeaks && (objective == "features")   % Plot experimental local velocity max & min
-    %             plot(velChange_exp*st,velPeaks_exp,'Marker','s','MarkerSize',12,...
-    %                'Color','magenta','LineWidth',1.5,'LineStyle','none')
-    %         end
-    %         if printDes
-    %             % Plot individual input velocity submovements
-    %             [vcRows, vcCols] = size(vc);
-    %             td = 0:st:(vcCols-1)*st;
-    %             for row = 1:vcRows
-    %                 plot(td,vc(row,:),'LineWidth',1.25,'Color',[0.9290, 0.6940, 0.1250])   
-    %             end
-    %             % Plot simulated output velocity
-    %             plot(tc, vel_sim, 'LineWidth', 2,'LineStyle','--','Color',[0.8500, 0.3250, 0.0980]);
-    %         end
-    %         trial = num2str(num+1);
-    %         title(['Trial' ' ' trial]);
-    %         xlabel('Time (s)')
-    %         ylabel('Cart Velocity (m/s)')
-    % 
-    %         % Ball angular velocity (omega): plot experimental versus simulation
-    %         set(groot,'CurrentFigure',bv);
-    %         subplot(plotRows,plotCols,num-numStart+1)                               
-    %         plot(te,omega,'LineWidth',2)
-    %         hold on;
-    %         if plotSim
-    %             plot(tc,omega_sim,'LineWidth',2)
-    %         end
-    %         trial = num2str(num+1);
-    %         title(['Trial' ' ' trial]);
-    %         xlabel('t (s)')
-    %         ylabel('ball velocity (deg/s)')
-    % 
-    %         % Cart acceleration (acc): plot experimental versus simulation
-    %         set(groot,'CurrentFigure',ca);
-    %         subplot(plotRows,plotCols,num-numStart+1)                               
-    %         plot(te,acc,'LineWidth',2)
-    %         hold on;
-    %         if plotSim
-    %             plot(tc,acc_sim,'LineWidth',2)
-    %         end
-    %         trial = num2str(num+1);
-    %         title(['Trial' ' ' trial]);
-    %         xlabel('t (s)')
-    %         ylabel('cart acceleration (m/s^2)')
-    % 
-    %         % Ball acceleration (alpha): plot experimental versus simulation
-    %         set(groot,'CurrentFigure',ba);
-    %         subplot(plotRows,plotCols,num-numStart+1)                               
-    %         plot(te,alpha,'LineWidth',2)
-    %         hold on;
-    %         if plotSim
-    %             plot(tc,alpha_sim,'LineWidth',2)
-    %         end
-    %         trial = num2str(num+1);
-    %         title(['Trial' ' ' trial]);
-    %         xlabel('t (s)')
-    %         ylabel('ball acceleration (deg/s^2)')
-    % %%%   %%%
-    
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
-            % Insert trial number, fmin and optimized parameter values into array
-    %         returnrow = num-numStart+1;
-    %         trial = num+1;
-    %         if fitMethod == "fitToAverage"
-    %             returnrow = 1;
-    %             trial = NaN; 
-    %         end
-    
-            % Fill array with best-fit optimization parameters
-    %         if optimizationType == "input shaping 4 impulse"
-    %             returnArray(num+1,:) = [trial, fmin, vrmse, optB, optK,...
-    %                 optShift,optTdelay, optA11, optA12, optA21, optA11, sub1End,...
-    %                 sub2Start, 0, relative_stop];
-            if optimizationType == "input shaping 2 impulse impedance"
-                returnArray(num+1,:) = [trial, fmin, vrmse, optB, optK,...
-                    optShift, optTdelay, optA1, optA2, sub1End, sub2Start,...
-                    0, relative_stop];
-    %         elseif optimizationType == "input shaping 2 impulse no impedance"
-    %             returnArray(num+1,:) = [trial, fmin, vrmse, optShift,...
-    %                 optTdelay, optA1, optA2, sub1End, sub2Start, 0,...
-    %                 relative_stop];
-    %         elseif optimizationType == "submovement"
-    %             returnArray(num+1,:) = [trial, fmin, vrmse, optB, optK, optD,...
-    %                 optt1, optt2, optTdelay, 0, relative_stop];
-            end
-    
-    %         % Get number of evaluations after optimization
-    %         G = globalData();
-    %         evals = G.evalCount;
-    %         disp(evals)
-    % 
-    %         % Print trial number and total evaluation count
-    %         disp(['Trial: ',num2str(num+1)])
-    %         disp(['Number of evaluations: ', num2str(evals(num+1))])
-
-        end
+        % Store best-fit parameters in array to be accessed outside
+        % parfor-loop
+%         xopt_array{num+1,1} = xopt;
+%         xopt_array{num+1,1} = fmin;
+        xopt_array(num+1,:) = {xopt, fmin}
 
     end
+
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Output results of optimization
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+for num = numStart:numEnd
+
+    xopt = xopt_array{num+1,1};
+    fmin = xopt_array{num+1,2};
+
+    % Extract best-fit parameters from optimization output
+    optB = xopt(1);
+    optK = xopt(2);
+    if optimizationType == "input shaping 4 impulse"
+        optP        = xopt(3);
+        optQ        = xopt(4);
+        optR        = xopt(5);
+        optS        = xopt(6);
+        optTcount   = xopt(7);
+        
+        if ampMod == true
+            optA11  = xopt(8);
+            optA12  = xopt(9);
+            optA21  = xopt(10);
+            optA22  = xopt(11);
+        else
+            optA11  = 1;
+            optA12  = 1;
+            optA21  = 1;
+            optA22  = 1;
+        end
+        
+    elseif optimizationType == "input shaping 2 impulse impedance"
+        optP        = xopt(3);
+        optQ        = xopt(4);
+        optTcount   = xopt(5);
+        
+        if ampMod == true
+            optA1   = xopt(6);
+            optA2   = xopt(7);
+        else
+            optA1   = 1;
+            optA2   = 1;
+        end
+    elseif optimizationType == "input shaping 2 impulse no impedance"
+        optP        = xopt(1);                                              
+        optQ        = xopt(2);
+        optTcount   = xopt(3);
+        
+        if ampMod == true
+            optA1   = xopt(4);
+            optA2   = xopt(5);
+        else
+            optA1   = 1;
+            optA2   = 1;
+        end
+    elseif optimizationType == "submovement"
+        optD        = xopt(3);
+        optt1       = xopt(4);
+        optt2       = xopt(5);
+        optTcount   = xopt(6);
+    end
+    %%%%%%
+
+    % Construct file name and load file of one experimental trial
+    numStr = num2str(num);
+    fileStr = strcat(subjStr,trialDate,trialStr,numStr);
+    
+    % Parallel version:
+    structTrial = load(fileStr,'pos','theta','vel','omega','acc','alpha','t');
+    pos = structTrial.pos;
+    theta = structTrial.theta;
+    vel = structTrial.vel;
+    omega = structTrial.omega;
+    acc = structTrial.acc;
+    alpha = structTrial.alpha;
+    t = structTrial.t;
+    
+
+    % Load start and stop indices of corresponding trial. Note that trials
+    % are indexed from 0, so add 1 to access correct row in array.
+    start   = Expression1(num+1,1);
+    stop    = Expression1(num+1,2);
+
+    % Trim experimental data
+    [pos,theta,vel,omega,acc,alpha,tdes,~] = ...
+        trimData(pos,theta,vel,omega,acc,alpha,t,st,start,stop);
+
+    % Define cart final position, initial and final velocities, and
+    % pendulum release time from experimental data
+    xEnd = pos(end);
+    vStart = vel(1);
+    vEnd = vel(end);
+    pendIndex = find(vel > 0.1, 1);                                     % The first time index that cart velocity surpasses 0.1 m/s
+
+    % Extend time vector to maximum delayed size. All time vectors will
+    % be the same length, so shorter trials will be padded.
+    tDesMax = tdes + delayMax;
+    tc=0:st:tDesMax;
+
+    % Translate optimization time parameters to actual times in seconds
+%     optTdelay   = 0.5*(optTcount-1)*delayMax;
+    optTdelay   = (optTcount-2)*delayMax;
+    tdessim     = tdes + optTdelay;
+    if optimizationType == "input shaping 4 impulse"
+        optShift    = shift*[optP-2,optQ-2,optR-2,optS-2];
+    elseif optimizationType == "input shaping 2 impulse impedance" ||...
+            optimizationType == "input shaping 2 impulse no impedance"
+        optShift    = shift*[optP-2,optQ-2];
+    end
+    
+    % Create system using optimal hyperparameters
+    [sys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
+        sysCreate(optB,optK,forwardF,ver,impedance,printSys);
+
+    if printSys
+        % Output damping ratios and damped natural periods
+        optB
+        optK
+        zeta1
+        zeta2
+        Td1
+        Td2
+    end    
+
+    % Simulate system with optimized parameters
+    if optimizationType == "input shaping 4 impulse"
+        modes = 2;
+        [output,vc,sub1End,sub2Start,dur_corr] = simInputShape(optB,optK,sys,...
+            sysRigid,Td1,Td2,zeta1,zeta2,tdes,tdessim,xEnd,vStart,vEnd,...
+            optA11,optA12,optA21,optA22,optP,optQ,optR,optS,st,shift,...
+            forwardF,simVersion,modes,pendIndex,fitMethod);
+        
+    elseif optimizationType == "input shaping 2 impulse impedance" || ...
+            optimizationType == "input shaping 2 impulse no impedance"
+        
+        modes   = 1;
+        Td2     = 0;
+        zeta2   = 0;
+        fa21    = 0;
+        fa22    = 0;
+        r       = 0;
+        s       = 0;
+        [output,vc,sub1End,sub2Start,dur_corr] = simInputShape(optB,optK,sys,...
+            sysRigid,Td,Td2,zeta,zeta2,tdes,tdessim,xEnd,vStart,vEnd,...
+            optA1,optA2,fa21,fa22,optP,optQ,r,s,st,shift,forwardF,...
+            simVersion,modes,pendIndex,fitMethod);
+
+    elseif optimizationType == "submovement"
+        [output, vc] = simSubmovements(sys,sysRigid,tdes,tdessim,st,xEnd,vStart,...
+            optD,optt1,optt2,pendIndex,simVersion,forwardF,impedance);
+    end
+    
+    % If using feature-based objective function, find location of simulated
+    % peaks
+    if objective == "features"
+       objCalc(objective,output,pos,theta,vel,omega,acc,alpha,weights,...
+           blockStr,blockNum,subjNum,num);
+       G = globalData();
+       velChange_exp = G.velChange_exp;
+       velPeaks_exp = G.velPeaks_exp;
+       velChange_sim = G.velChange_sim;
+       velPeaks_sim = G.velPeaks_sim;
+
+       % SAVEPEAKS
+       % Add peaks to cell array
+%        peakArray{num+1,1} = [velChange_exp; velPeaks_exp];
+
+    % If just plotting peaks, without using for objective function
+    elseif plotPeaks
+        vel_sim = output(:,3);
+        acc_sim = output(:,5); 
+        [velChange_sim, velPeaks_sim] = peakCalc(vel_sim, acc_sim);
+    end
+    
+    % Rename outputs for ease of use
+    pos_sim     = output(:,1);
+    theta_sim   = output(:,2);
+    vel_sim     = output(:,3);
+    omega_sim   = output(:,4);
+    acc_sim     = output(:,5);
+    alpha_sim   = output(:,6);
+    
+    % Handle any size difference due to rounding error
+    lensim = length(vel_sim);
+    lenexp = length(pos);
+    lentc  = length(tc);
+    
+    if lensim ~= lenexp
+        smaller = min(lensim,lenexp);
+
+        % To calculate RMSE only during times when both profiles are
+        % defined, shorten the longer array to the shorter one's length
+        if lensim > lenexp
+            vel_sim_RMSE    = vel_sim(1:smaller);
+            vel_RMSE        = vel;
+        else
+            vel_RMSE        = vel(1:smaller);
+            vel_sim_RMSE    = vel_sim;
+        end
+        
+    else
+        vel_RMSE            = vel;
+        vel_sim_RMSE        = vel_sim;
+    end
+    
+    % Make time vector same length as simulated data
+    if lensim ~= lentc
+        tc = 0:st:(lensim-1)*st;
+    end
+    
+    % Calculate cart velocity RMSE
+    dvel        = vel_sim_RMSE - vel_RMSE';
+    dvel        = dvel/max(vel);
+    squareVel   = dvel.^2;
+    vrmse       = sqrt((1/length(squareVel))*sum(squareVel));
+    
+    % Insert trial number, fmin and optimized parameter values into array
+    returnrow = num-numStart+1;
+    trial = num+1;
+    if fitMethod == "fitToAverage"
+        returnrow = 1;
+        trial = NaN; 
+    end
+
+%     % DEBUG
+%     disp('Size of evals: ')
+%     disp(size(evals))
+
+%     if optimizationType == "input shaping 4 impulse"
+%         returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK,...
+%             optShift,optTdelay, optA11, optA12, optA21, optA11, sub1End,...
+%             sub2Start, evals(num+1), opt.xtol_rel];
+%     elseif optimizationType == "input shaping 2 impulse impedance"
+%         returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK,...
+%             optShift, optTdelay, optA1, optA2, sub1End, sub2Start,...
+%             evals(num+1), opt.xtol_rel];
+%     elseif optimizationType == "input shaping 2 impulse no impedance"
+%         returnArray(returnrow,:) = [trial, fmin, vrmse, optShift,...
+%             optTdelay, optA1, optA2, sub1End, sub2Start, evals(num+1),...
+%             opt.xtol_rel];
+%     elseif optimizationType == "submovement"
+%         returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK, optD,...
+%             optt1, optt2, optTdelay, evals(num+1), opt.xtol_rel];
+%     end
+    
+    % Save best-fit output to a spreadsheet    
+    dur_corr_vector = zeros(length(vel_sim),1);
+    dur_corr_vector(1) = dur_corr;
+    outputArray = [tc', pos_sim, theta_sim, vel_sim, omega_sim, acc_sim, alpha_sim, dur_corr_vector];
+    profileVariables = {'Time [s]', 'Cart Pos [m]', 'Ball Angle [deg]',...
+        'Cart Vel [m/s]','Ball Ang Vel [deg/s]', 'Cart Acc [m/s^2]',...
+        'Ball Ang Acc [deg/s^2]', 'Pre-Trim Duration [s]'};
+    ProfileT = array2table(outputArray,'VariableNames',profileVariables);
+    trialNumStr = num2str(returnrow);
+    fileName = strcat(folderStr, "/best-fit profiles/", trialNumStr, ".xlsx");
+    writetable(ProfileT,fileName);
+    
+    %%%% Check if "best" solution is actually one of filtered cases
+    % If cart velocity solution is ~0 velocity
+    if mean(vel_sim)<0.1      
+        disp('Chosen trajectory is 0 velocity');
+
+    % If cart velocity exceeds saturation limit
+    elseif max(vel_sim) > 0.5
+        disp('Chosen trajectory over max velocity');
+
+    % If cart velocity exceeds saturation minimum
+    elseif min(vel_sim) < -0.075
+        disp('Chosen trajectory under min velocity');
+
+    % If ball angle exceeds saturation limit
+    elseif max(theta_sim) > 50
+        disp('Chosen trajectory over max ball angle');
+
+    % If ball angular velocity exceeds saturation limit
+    elseif max(omega_sim) > 75
+        disp('chosen trajectory over max ball velocity');
+
+    % If cart acceleration exceeds saturation limit
+    elseif max(acc_sim) > 5
+        disp('Chosen trajectory over max cart acceleration');
+        %{
+    % If ball acceleration exceeds saturation limit
+    elseif max(alpha_sim) > 15
+        disp('Chosen trajectory over max ball acceleration')
+        %}
+    end
+    
+    % Define time vector for experimental profile
+    te = 0:st:(lenexp-1)*st;
+    
+    % Subplot current trial in large figure window with multiple trials
+    if plotInd
+        % Plot Individual Velocity Trajectory
+        labelFontSize = 24;
+        titleFontSize = 28;
+        axisFontSize = 16;
+        lineWidth = 3;
+        colGreen = [0, 153, 51]/255;
+        colOrange = [255, 153, 0]/255;
+        colBlue = [0, 102, 255]/255;
+        colGrey = [153, 153, 153]/255;
+        colDarkGrey = [51, 51, 51]/255;
+        defaultBlue = [0, 0.4470, 0.7410];
+        defaultOrange = [0.8500, 0.3250, 0.0980];
+
+        % For characteristic trials:
+        % Cart velocity (vel): plot experimental versus simulation
+        set(groot,'CurrentFigure',cv);
+        plot(te,vel,'LineWidth',lineWidth,'Color',defaultBlue)
+        hold on;
+        if plotSim      % Plot simulated profile
+            plot(tc,vel_sim,'LineWidth',lineWidth,'Color',defaultOrange)
+        end
+        if plotPeaks   % Plot local velocity max & min
+           plot(velChange_exp*st,velPeaks_exp,'Marker','*','MarkerSize',12,...
+               'Color','magenta','LineWidth',2,'LineStyle','none')
+        end
+        set(gca,'FontSize',axisFontSize)
+        xlabel('Time (s)','FontSize',labelFontSize)
+        ylabel('Cart Velocity (m/s)','FontSize',labelFontSize)
+        subjNum = erase(subjNum,'S');
+        if fitMethod ~= "fitToAverage"
+            title(['Subject ', subjNum, ', Block ', block3or4 ', Trial ',...
+                num2str(trialNumber)],'FontSize',titleFontSize);
+        end
+        
+        % For flow diagram: simulated cart velocity only
+        %{
+        labelFontSize = 18;
+        titleFontSize = 20;
+        axisFontSize = 16;
+        lineWidth = 2;
+        
+        figure();
+        plot(tc,vel_sim,'LineWidth',lineWidth,'Color',defaultOrange)
+        set(gca,'FontSize',axisFontSize)
+        xlabel('Time (s)','FontSize',labelFontSize)
+        ylabel('Cart Velocity (m/s)','FontSize',labelFontSize)
+        title('Output Cart Velocity', 'FontSize',titleFontSize)
+        
+        % Trim simulated profile
+        if length(vel_sim) > length(vel)
+            vel_sim     = vel_sim(1:length(vel));
+            tc          = tc(1:length(vel));
+        end
+        
+        % For flow diagram: both simulated & experimental cart velocity
+        figure();
+        plot(te,vel,'LineWidth',lineWidth,'Color',defaultBlue)
+        hold on;
+        plot(tc,vel_sim,'LineWidth',lineWidth,'Color',defaultOrange)
+        set(gca,'FontSize',axisFontSize)
+        xlabel('Time (s)','FontSize',labelFontSize)
+        ylabel('Cart Velocity (m/s)','FontSize',labelFontSize)
+        title('Experimental and Simulated Cart Velocities','FontSize',titleFontSize)
+        %}
+        
+    else
+        
+        % Before sending data to plot, make sure all arrays are row vectors
+        sz_te = size(te);
+        sz_tc = size(tc);
+        sz_pos = size(pos);
+        sz_pos_sim = size(pos_sim);
+
+        if sz_te(1) ~= 1
+            te = te';
+        end
+
+        if sz_tc(1) ~= 1
+            tc = tc';
+        end
+
+        if sz_pos(1) ~=1
+            pos = pos';
+            % ADD OTHER VARIABLES HERE ONCE IT WORKS FOR POS
+        end
+        
+        if sz_pos_sim(1) ~= 1
+            pos_sim = pos_sim';
+        end
+
+        % Cart position (pos): plot experimental versus simulation
+        posData = cat(2, plotRows, plotCols, num, numStart, length(te), length(tc), te, pos, tc, pos_sim);
+        send(D, posData)
+
+        set(groot,'CurrentFigure',cp);
+        subplot(plotRows,plotCols,num-numStart+1)                               
+        plot(te,pos,'LineWidth',2)
+        hold on;
+        if plotSim
+            plot(tc,pos_sim,'LineWidth',2)
+        end
+        trial = num2str(num+1);
+        title(['Trial' ' ' trial]);
+        xlabel('t (s)')
+        ylabel('cart position (m)')
+
+%         %%% Commented out while debugging parallel printing: %%%
+%         % Ball angle (theta): plot experimental versus simulation
+%         set(groot,'CurrentFigure',bp);
+%         subplot(plotRows,plotCols,num-numStart+1)                               
+%         plot(te,theta,'LineWidth',2)
+%         hold on;
+%         if plotSim
+%             plot(tc,theta_sim,'LineWidth',2)
+%         end
+%         trial = num2str(num+1);
+%         title(['Trial' ' ' trial]);
+%         xlabel('t (s)')
+%         ylabel('ball angle (deg)')
+% 
+%         % Cart velocity (vel): plot experimental versus simulation
+%         set(groot,'CurrentFigure',cv);
+%         subplot(plotRows,plotCols,num-numStart+1)                               
+%         plot(te,vel,'LineWidth',2)
+%         hold on;
+%         if plotSim && ~printDes
+%             plot(tc,vel_sim,'LineWidth',2)
+% %             if plotPeaks && (objective == "features")   % Plot simulated local velocity max & min
+%             if plotPeaks   % Plot simulated local velocity max & min
+%                 plot(velChange_sim*st,velPeaks_sim,'Marker','s','MarkerSize',12,...
+%                'Color','cyan','LineWidth',1.5,'LineStyle','none')
+%             end
+%         end
+%         if plotPeaks && (objective == "features")   % Plot experimental local velocity max & min
+%             plot(velChange_exp*st,velPeaks_exp,'Marker','s','MarkerSize',12,...
+%                'Color','magenta','LineWidth',1.5,'LineStyle','none')
+%         end
+%         if printDes
+%             % Plot individual input velocity submovements
+%             [vcRows, vcCols] = size(vc);
+%             td = 0:st:(vcCols-1)*st;
+%             for row = 1:vcRows
+%                 plot(td,vc(row,:),'LineWidth',1.25,'Color',[0.9290, 0.6940, 0.1250])   
+%             end
+%             % Plot simulated output velocity
+%             plot(tc, vel_sim, 'LineWidth', 2,'LineStyle','--','Color',[0.8500, 0.3250, 0.0980]);
+%         end
+%         trial = num2str(num+1);
+%         title(['Trial' ' ' trial]);
+%         xlabel('Time (s)')
+%         ylabel('Cart Velocity (m/s)')
+% 
+%         % Ball angular velocity (omega): plot experimental versus simulation
+%         set(groot,'CurrentFigure',bv);
+%         subplot(plotRows,plotCols,num-numStart+1)                               
+%         plot(te,omega,'LineWidth',2)
+%         hold on;
+%         if plotSim
+%             plot(tc,omega_sim,'LineWidth',2)
+%         end
+%         trial = num2str(num+1);
+%         title(['Trial' ' ' trial]);
+%         xlabel('t (s)')
+%         ylabel('ball velocity (deg/s)')
+% 
+%         % Cart acceleration (acc): plot experimental versus simulation
+%         set(groot,'CurrentFigure',ca);
+%         subplot(plotRows,plotCols,num-numStart+1)                               
+%         plot(te,acc,'LineWidth',2)
+%         hold on;
+%         if plotSim
+%             plot(tc,acc_sim,'LineWidth',2)
+%         end
+%         trial = num2str(num+1);
+%         title(['Trial' ' ' trial]);
+%         xlabel('t (s)')
+%         ylabel('cart acceleration (m/s^2)')
+% 
+%         % Ball acceleration (alpha): plot experimental versus simulation
+%         set(groot,'CurrentFigure',ba);
+%         subplot(plotRows,plotCols,num-numStart+1)                               
+%         plot(te,alpha,'LineWidth',2)
+%         hold on;
+%         if plotSim
+%             plot(tc,alpha_sim,'LineWidth',2)
+%         end
+%         trial = num2str(num+1);
+%         title(['Trial' ' ' trial]);
+%         xlabel('t (s)')
+%         ylabel('ball acceleration (deg/s^2)')
+% %%%   %%%
+        
+    end    
+
+            % Insert trial number, fmin and optimized parameter values into array
+%         returnrow = num-numStart+1;
+%         trial = num+1;
+%         if fitMethod == "fitToAverage"
+%             returnrow = 1;
+%             trial = NaN; 
+%         end
+
+        % Fill array with best-fit optimization parameters
+%         if optimizationType == "input shaping 4 impulse"
+%             returnArray(num+1,:) = [trial, fmin, vrmse, optB, optK,...
+%                 optShift,optTdelay, optA11, optA12, optA21, optA11, sub1End,...
+%                 sub2Start, 0, relative_stop];
+        if optimizationType == "input shaping 2 impulse impedance"
+            returnArray(num+1,:) = [trial, fmin, vrmse, optB, optK,...
+                optShift, optTdelay, optA1, optA2, sub1End, sub2Start,...
+                0, relative_stop];
+%         elseif optimizationType == "input shaping 2 impulse no impedance"
+%             returnArray(num+1,:) = [trial, fmin, vrmse, optShift,...
+%                 optTdelay, optA1, optA2, sub1End, sub2Start, 0,...
+%                 relative_stop];
+%         elseif optimizationType == "submovement"
+%             returnArray(num+1,:) = [trial, fmin, vrmse, optB, optK, optD,...
+%                 optt1, optt2, optTdelay, 0, relative_stop];
+        end
+
+%         % Get number of evaluations after optimization
+%         G = globalData();
+%         evals = G.evalCount;
+%         disp(evals)
+% 
+%         % Print trial number and total evaluation count
+%         disp(['Trial: ',num2str(num+1)])
+%         disp(['Number of evaluations: ', num2str(evals(num+1))])
+
+end
+
+
 
 % For determining what algorithm name the NLopt number corresponds to.
 % disp('algorithm number: ')

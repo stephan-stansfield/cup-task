@@ -4,11 +4,15 @@ function [val, gradient] = objFunc(x,optimizationType,ampMod,...
         acc,theta,omega,alpha,weights,blockStr,blockNum,subjNum,num,tDesMax,fitMethod)
     
     printDes = false;
-    
+
     % Increment evaluation counter
-    G = globalData();
-    evalCount = G.evalCount;
-    globalData('evalCount', evalCount+1);
+%     G = globalData();
+%     evalCount = G.evalCount;
+%     % DEBUG
+%     disp(evalCount)
+%     evalCount(num+1) = evalCount(num+1) + 1;
+%     G = globalData('evalCount', evalCount);
+    
 
     % Parameters to optimize over are passed in array x. For readability, 
     % assign variables to x array elements.

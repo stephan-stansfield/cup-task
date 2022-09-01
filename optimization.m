@@ -47,6 +47,15 @@ Kmin        = 0;                                                            % Mi
 Kmax        = 250;                                                          % Maximum stiffness value (N/m)
 st          = 0.001;                                                        % Simulation time step (s)
 tDesMax     = 0;                                                            % Initialize maximum time duration
+
+% Choose optimization algorithm (uncomment desired algorithm)
+    algorithm = NLOPT_GN_CRS2_LM;                                       % Controlled Random Search (CRS) with local mutation
+%     algorithm = NLOPT_GN_DIRECT;                                        % DIRECT (DIviding RECTangles)
+%     algorithm = NLOPT_GN_DIRECT_NOSCAL;                                 % DIRECT, unscaled variant
+%     algorithm = NLOPT_GN_DIRECT_L;                                      % DIRECT-L (locally biased variant of DIRECT)
+%     algorithm = NLOPT_GN_DIRECT_L_RAND;                                 % DIRECT-L, slightly randomized variant
+%     algorithm = NLOPT_GN_ISRES;                                         % ISRES (Improved Stochastic Ranking Evolution Strategy)
+%     algorithm = NLOPT_GN_ESCH;                                          % ESCH (evolutionary algorithm)
     
 % Run main program for selected experimental block and
 % simulation settings
@@ -169,8 +178,9 @@ if plotInd
     figure('Name','Cart velocity','units','normalized','outerposition',[0 0 1 1]);
     cv = get(gcf,'Number');
 else
-    figure('Name','Cart position','units','normalized','outerposition',[0 0 1 1]);
-    cp = get(gcf,'Number');
+    cp = figure('Name','Cart position','units','normalized','outerposition',[0 0 1 1]);
+%     cp = get(gcf,'Number');
+%     cp = get(gcf);
 
     % Set up data queue to fetch results during parallel optimization
     D = parallel.pool.DataQueue;
@@ -191,6 +201,9 @@ else
     figure('Name','Ball angular acceleration','units','normalized','outerposition',[0 0 1 1]);
     ba = get(gcf,'Number');
 end
+
+% Initialize persistent variable array holding evaluation count for all trials
+% G = globalData('evalCount', zeros(1,50));
     
 % Create folder to hold this trial's data and subfolder to hold best-fit
 % profiles
@@ -207,17 +220,14 @@ load(strcat("trim times/",blockStr),'Expression1')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % NLOPT FUNCTION
-function [algorithm, lb, ub, maxeval] = NLopt(tc,tdes,xEnd,vStart,vEnd,...
-        pendIndex,pos,vel,acc,theta,omega,alpha,num,cp,cv,ca,bp,bv,ba)
+function [trial, fmin, vrmse, optB, optK,optShift, optTdelay, optA1, optA2,sub1End, sub2Start, relative_stop] = NLopt(tc, tdes,...
+        xEnd,vStart,vEnd,pendIndex,pos,vel,acc,theta,omega,alpha,num,cp,...
+        cv,ca,bp,bv,ba,algorithm,setMaxEval)
+% function NLopt(tc, tdes,xEnd,vStart,vEnd,pendIndex,pos,vel,acc,theta,omega,...
+%         alpha,num,cp,cv,ca,bp,bv,ba,algorithm,setMaxEval)
     
-    % Choose optimization algorithm (uncomment desired algorithm)
-    opt.algorithm = NLOPT_GN_CRS2_LM;                                       % Controlled Random Search (CRS) with local mutation
-%     opt.algorithm = NLOPT_GN_DIRECT;                                        % DIRECT (DIviding RECTangles)
-%     opt.algorithm = NLOPT_GN_DIRECT_NOSCAL;                                 % DIRECT, unscaled variant
-%     opt.algorithm = NLOPT_GN_DIRECT_L;                                      % DIRECT-L (locally biased variant of DIRECT)
-%     opt.algorithm = NLOPT_GN_DIRECT_L_RAND;                                 % DIRECT-L, slightly randomized variant
-%     opt.algorithm = NLOPT_GN_ISRES;                                         % ISRES (Improved Stochastic Ranking Evolution Strategy)
-%     opt.algorithm = NLOPT_GN_ESCH;                                          % ESCH (evolutionary algorithm)
+    % Set optimization algorithm
+    opt.algorithm = algorithm;
     
     % Define lower and upper parameter bounds
     if optimizationType == "input shaping 4 impulse"
@@ -297,24 +307,28 @@ function [algorithm, lb, ub, maxeval] = NLopt(tc,tdes,xEnd,vStart,vEnd,...
     % absolute value of that component of x (e.g., xtol_rel = .01 means the
     % optimization will stop when a step changes all parameters by less
     % than 1%)
-    opt.xtol_rel = 0.00001;
+    relative_stop = 0.00001;
+    opt.xtol_rel = relative_stop;
 
     % Maximum number of evaluations before stopping the algorithm
     opt.maxeval = setMaxEval;
-    
-    % Output optimization parameters for posterity
-    algorithm   = opt.algorithm;
-    lb          = opt.lower_bounds;
-    ub          = opt.upper_bounds;
-    maxeval     = opt.maxeval;
+
+    % DEBUG: try setting verbose output
+    opt.verbose = 1;
 
     % Run NLopt algorithm
     % @xopt: optimal values of the optimization hyperparameters
     % @fmin: minimum objective function value
     [xopt, fmin, ~] = nlopt_optimize(opt, init_guess);
     
-    G = globalData();
-    evalCount = G.evalCount;
+%     G = globalData();
+%     evals = G.evalCount;
+
+%     % DEBUG
+%     disp(evals)
+% 
+%     evalNum = evals(num+1);
+
     
     % Extract best-fit parameters from optimization output
     optB = xopt(1);
@@ -486,29 +500,34 @@ function [algorithm, lb, ub, maxeval] = NLopt(tc,tdes,xEnd,vStart,vEnd,...
     squareVel   = dvel.^2;
     vrmse       = sqrt((1/length(squareVel))*sum(squareVel));
     
-    % Insert trial number, fmin and optimized parameter values into array
-    returnrow = num-numStart+1;
-    trial = num+1;
-    if fitMethod == "fitToAverage"
-        returnrow = 1;
-        trial = NaN; 
-    end
-    if optimizationType == "input shaping 4 impulse"
-        returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK,...
-            optShift,optTdelay, optA11, optA12, optA21, optA11, sub1End,...
-            sub2Start, evalCount, opt.xtol_rel];
-    elseif optimizationType == "input shaping 2 impulse impedance"
-        returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK,...
-            optShift, optTdelay, optA1, optA2, sub1End, sub2Start,...
-            evalCount, opt.xtol_rel];
-    elseif optimizationType == "input shaping 2 impulse no impedance"
-        returnArray(returnrow,:) = [trial, fmin, vrmse, optShift,...
-            optTdelay, optA1, optA2, sub1End, sub2Start, evalCount,...
-            opt.xtol_rel];
-    elseif optimizationType == "submovement"
-        returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK, optD,...
-            optt1, optt2, optTdelay, evalCount, opt.xtol_rel];
-    end
+%     % Insert trial number, fmin and optimized parameter values into array
+%     returnrow = num-numStart+1;
+%     trial = num+1;
+%     if fitMethod == "fitToAverage"
+%         returnrow = 1;
+%         trial = NaN; 
+%     end
+
+%     % DEBUG
+%     disp('Size of evals: ')
+%     disp(size(evals))
+
+%     if optimizationType == "input shaping 4 impulse"
+%         returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK,...
+%             optShift,optTdelay, optA11, optA12, optA21, optA11, sub1End,...
+%             sub2Start, evals(num+1), opt.xtol_rel];
+%     elseif optimizationType == "input shaping 2 impulse impedance"
+%         returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK,...
+%             optShift, optTdelay, optA1, optA2, sub1End, sub2Start,...
+%             evals(num+1), opt.xtol_rel];
+%     elseif optimizationType == "input shaping 2 impulse no impedance"
+%         returnArray(returnrow,:) = [trial, fmin, vrmse, optShift,...
+%             optTdelay, optA1, optA2, sub1End, sub2Start, evals(num+1),...
+%             opt.xtol_rel];
+%     elseif optimizationType == "submovement"
+%         returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK, optD,...
+%             optt1, optt2, optTdelay, evals(num+1), opt.xtol_rel];
+%     end
     
     % Save best-fit output to a spreadsheet    
     dur_corr_vector = zeros(length(vel_sim),1);
@@ -625,8 +644,31 @@ function [algorithm, lb, ub, maxeval] = NLopt(tc,tdes,xEnd,vStart,vEnd,...
         
     else
         
+        % Before sending data to plot, make sure all arrays are row vectors
+        sz_te = size(te);
+        sz_tc = size(tc);
+        sz_pos = size(pos);
+        sz_pos_sim = size(pos_sim);
+
+        if sz_te(1) ~= 1
+            te = te';
+        end
+
+        if sz_tc(1) ~= 1
+            tc = tc';
+        end
+
+        if sz_pos(1) ~=1
+            pos = pos';
+            % ADD OTHER VARIABLES HERE ONCE IT WORKS FOR POS
+        end
+        
+        if sz_pos_sim(1) ~= 1
+            pos_sim = pos_sim';
+        end
+
         % Cart position (pos): plot experimental versus simulation
-        posData = [plotRows, plotCols, num, numStart];
+        posData = cat(2, plotRows, plotCols, num, numStart, length(te), length(tc), te, pos, tc, pos_sim);
         send(D, posData)
 
         set(groot,'CurrentFigure',cp);
@@ -889,7 +931,7 @@ else
 
     % Loop through trials, fitting values for each one
     % Parallel version:
-    parfor num = numStart:1:numEnd
+    parfor num = numStart:numEnd
         numStr = num2str(num);
 
         % Construct file name and load file of one experimental trial
@@ -927,18 +969,48 @@ else
         tDesMax = tdes + delayMax;
         tc=0:st:tDesMax;
 
-        % Initialize variables shared by objFunc.m objective function
-        G = globalData('evalCount', 0);
-        evalCount = G.evalCount;
-
         %%% Run optimization. Fit values to selected experimental trial. %%%
         % Parallel version:
-        [algorithm, ~, ~, maxeval] = feval(NLoptHandle,tc,tdes,xEnd,vStart,...
-            vEnd,pendIndex,pos,vel,acc,theta,omega,alpha,num,cp,cv,ca,bp,bv,ba);
+        [trial, fmin, vrmse, optB, optK,optShift, optTdelay, optA1, optA2,sub1End, sub2Start, relative_stop] = feval(NLoptHandle,...
+            tc,tdes,xEnd,vStart,vEnd,pendIndex,pos,vel,acc,...
+            theta,omega,alpha,num,cp,cv,ca,bp,bv,ba,algorithm,setMaxEval);
+%         feval(NLoptHandle,tc,tdes,xEnd,vStart,vEnd,pendIndex,pos,vel,acc,...
+%             theta,omega,alpha,num,cp,cv,ca,bp,bv,ba,algorithm,setMaxEval,returnArray);
 
-        % Print trial number and total evaluation count
-        disp(['Trial: ',num2str(num)])
-        disp(['Number of evaluations: ', num2str(evalCount)])
+        % Insert trial number, fmin and optimized parameter values into array
+%         returnrow = num-numStart+1;
+%         trial = num+1;
+%         if fitMethod == "fitToAverage"
+%             returnrow = 1;
+%             trial = NaN; 
+%         end
+
+        % Fill array with best-fit optimization parameters
+%         if optimizationType == "input shaping 4 impulse"
+%             returnArray(num+1,:) = [trial, fmin, vrmse, optB, optK,...
+%                 optShift,optTdelay, optA11, optA12, optA21, optA11, sub1End,...
+%                 sub2Start, 0, relative_stop];
+        if optimizationType == "input shaping 2 impulse impedance"
+            returnArray(num+1,:) = [trial, fmin, vrmse, optB, optK,...
+                optShift, optTdelay, optA1, optA2, sub1End, sub2Start,...
+                0, relative_stop];
+%         elseif optimizationType == "input shaping 2 impulse no impedance"
+%             returnArray(num+1,:) = [trial, fmin, vrmse, optShift,...
+%                 optTdelay, optA1, optA2, sub1End, sub2Start, 0,...
+%                 relative_stop];
+%         elseif optimizationType == "submovement"
+%             returnArray(num+1,:) = [trial, fmin, vrmse, optB, optK, optD,...
+%                 optt1, optt2, optTdelay, 0, relative_stop];
+        end
+
+%         % Get number of evaluations after optimization
+%         G = globalData();
+%         evals = G.evalCount;
+%         disp(evals)
+% 
+%         % Print trial number and total evaluation count
+%         disp(['Trial: ',num2str(num+1)])
+%         disp(['Number of evaluations: ', num2str(evals(num+1))])
 
     end
 
@@ -951,6 +1023,10 @@ end
 % For determining what algorithm name the NLopt number corresponds to.
 % disp('algorithm number: ')
 % disp(num2str(algorithm))
+
+% % Retrieve optimization info from persistent variable
+% algorithm = G.algorithm;
+% maxeval = G.maxeval;
 
 % Look up NL opt algorithm name from double output
 if algorithm == 0
@@ -982,8 +1058,8 @@ Kbounds         = strcat("K bounds: ", convertCharsToStrings(num2str(Kmin)),...
                     " to ", convertCharsToStrings(num2str(Kmax)));
 durationtime    = strcat("Max duration error: ",...
                     convertCharsToStrings(num2str(delayMax*1000)), " ms");
-maxeval         = strcat("Eval max: ",...
-                    convertCharsToStrings(num2str(maxeval)));
+setMaxEval         = strcat("Eval max: ",...
+                    convertCharsToStrings(num2str(setMaxEval)));
 wPosStr         = strcat("Cart position weight: ",...
                     convertCharsToStrings(num2str(wPos)));
 wThetaStr       = strcat("Ball position weight: ",...
@@ -1012,7 +1088,7 @@ paramTable{3,1}     = algorithm;
 paramTable{4,1}     = Bbounds;
 paramTable{5,1}     = Kbounds;
 paramTable{8,1}     = durationtime;
-paramTable{9,1}     = maxeval;
+paramTable{9,1}     = setMaxEval;
 paramTable{10,1}    = wPosStr;
 paramTable{11,1}    = wThetaStr;
 paramTable{12,1}    = wVelStr;

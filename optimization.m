@@ -930,9 +930,12 @@ for num = numStart:numEnd
             pos_sim = pos_sim';
         end
 
+        % Trial number as string for plot titles
+        trialCaption = num2str(num+1);
+
         % Cart position (pos): plot experimental versus simulation
-        posData = cat(2, plotRows, plotCols, num, numStart, length(te), length(tc), te, pos, tc, pos_sim);
-        send(D, posData)
+%         posData = cat(2, plotRows, plotCols, num, numStart, length(te), length(tc), te, pos, tc, pos_sim);
+%         send(D, posData)
 
         set(groot,'CurrentFigure',cp);
         subplot(plotRows,plotCols,num-numStart+1)                               
@@ -941,106 +944,101 @@ for num = numStart:numEnd
         if plotSim
             plot(tc,pos_sim,'LineWidth',2)
         end
-        trial = num2str(num+1);
-        title(['Trial' ' ' trial]);
+        title(['Trial' ' ' trialCaption]);
         xlabel('t (s)')
         ylabel('cart position (m)')
 
-%         %%% Commented out while debugging parallel printing: %%%
-%         % Ball angle (theta): plot experimental versus simulation
-%         set(groot,'CurrentFigure',bp);
-%         subplot(plotRows,plotCols,num-numStart+1)                               
-%         plot(te,theta,'LineWidth',2)
-%         hold on;
-%         if plotSim
-%             plot(tc,theta_sim,'LineWidth',2)
-%         end
-%         trial = num2str(num+1);
-%         title(['Trial' ' ' trial]);
-%         xlabel('t (s)')
-%         ylabel('ball angle (deg)')
-% 
-%         % Cart velocity (vel): plot experimental versus simulation
-%         set(groot,'CurrentFigure',cv);
-%         subplot(plotRows,plotCols,num-numStart+1)                               
-%         plot(te,vel,'LineWidth',2)
-%         hold on;
-%         if plotSim && ~printDes
-%             plot(tc,vel_sim,'LineWidth',2)
-% %             if plotPeaks && (objective == "features")   % Plot simulated local velocity max & min
-%             if plotPeaks   % Plot simulated local velocity max & min
-%                 plot(velChange_sim*st,velPeaks_sim,'Marker','s','MarkerSize',12,...
-%                'Color','cyan','LineWidth',1.5,'LineStyle','none')
-%             end
-%         end
-%         if plotPeaks && (objective == "features")   % Plot experimental local velocity max & min
-%             plot(velChange_exp*st,velPeaks_exp,'Marker','s','MarkerSize',12,...
-%                'Color','magenta','LineWidth',1.5,'LineStyle','none')
-%         end
-%         if printDes
-%             % Plot individual input velocity submovements
-%             [vcRows, vcCols] = size(vc);
-%             td = 0:st:(vcCols-1)*st;
-%             for row = 1:vcRows
-%                 plot(td,vc(row,:),'LineWidth',1.25,'Color',[0.9290, 0.6940, 0.1250])   
-%             end
-%             % Plot simulated output velocity
-%             plot(tc, vel_sim, 'LineWidth', 2,'LineStyle','--','Color',[0.8500, 0.3250, 0.0980]);
-%         end
-%         trial = num2str(num+1);
-%         title(['Trial' ' ' trial]);
-%         xlabel('Time (s)')
-%         ylabel('Cart Velocity (m/s)')
-% 
-%         % Ball angular velocity (omega): plot experimental versus simulation
-%         set(groot,'CurrentFigure',bv);
-%         subplot(plotRows,plotCols,num-numStart+1)                               
-%         plot(te,omega,'LineWidth',2)
-%         hold on;
-%         if plotSim
-%             plot(tc,omega_sim,'LineWidth',2)
-%         end
-%         trial = num2str(num+1);
-%         title(['Trial' ' ' trial]);
-%         xlabel('t (s)')
-%         ylabel('ball velocity (deg/s)')
-% 
-%         % Cart acceleration (acc): plot experimental versus simulation
-%         set(groot,'CurrentFigure',ca);
-%         subplot(plotRows,plotCols,num-numStart+1)                               
-%         plot(te,acc,'LineWidth',2)
-%         hold on;
-%         if plotSim
-%             plot(tc,acc_sim,'LineWidth',2)
-%         end
-%         trial = num2str(num+1);
-%         title(['Trial' ' ' trial]);
-%         xlabel('t (s)')
-%         ylabel('cart acceleration (m/s^2)')
-% 
-%         % Ball acceleration (alpha): plot experimental versus simulation
-%         set(groot,'CurrentFigure',ba);
-%         subplot(plotRows,plotCols,num-numStart+1)                               
-%         plot(te,alpha,'LineWidth',2)
-%         hold on;
-%         if plotSim
-%             plot(tc,alpha_sim,'LineWidth',2)
-%         end
-%         trial = num2str(num+1);
-%         title(['Trial' ' ' trial]);
-%         xlabel('t (s)')
-%         ylabel('ball acceleration (deg/s^2)')
-% %%%   %%%
+        % Ball angle (theta): plot experimental versus simulation
+        set(groot,'CurrentFigure',bp);
+        subplot(plotRows,plotCols,num-numStart+1)                               
+        plot(te,theta,'LineWidth',2)
+        hold on;
+        if plotSim
+            plot(tc,theta_sim,'LineWidth',2)
+        end
+        title(['Trial' ' ' trialCaption]);
+        xlabel('t (s)')
+        ylabel('ball angle (deg)')
+
+        % Cart velocity (vel): plot experimental versus simulation
+        set(groot,'CurrentFigure',cv);
+        subplot(plotRows,plotCols,num-numStart+1)                               
+        plot(te,vel,'LineWidth',2)
+        hold on;
+        if plotSim && ~printDes
+            plot(tc,vel_sim,'LineWidth',2)
+%             if plotPeaks && (objective == "features")   % Plot simulated local velocity max & min
+            if plotPeaks   % Plot simulated local velocity max & min
+                plot(velChange_sim*st,velPeaks_sim,'Marker','s','MarkerSize',12,...
+               'Color','cyan','LineWidth',1.5,'LineStyle','none')
+            end
+        end
+        if plotPeaks && (objective == "features")   % Plot experimental local velocity max & min
+            plot(velChange_exp*st,velPeaks_exp,'Marker','s','MarkerSize',12,...
+               'Color','magenta','LineWidth',1.5,'LineStyle','none')
+        end
+        if printDes
+            % Plot individual input velocity submovements
+            [vcRows, vcCols] = size(vc);
+            td = 0:st:(vcCols-1)*st;
+            for row = 1:vcRows
+                plot(td,vc(row,:),'LineWidth',1.25,'Color',[0.9290, 0.6940, 0.1250])   
+            end
+            % Plot simulated output velocity
+            plot(tc, vel_sim, 'LineWidth', 2,'LineStyle','--','Color',[0.8500, 0.3250, 0.0980]);
+        end
+        title(['Trial' ' ' trialCaption]);
+        xlabel('Time (s)')
+        ylabel('Cart Velocity (m/s)')
+
+        % Ball angular velocity (omega): plot experimental versus simulation
+        set(groot,'CurrentFigure',bv);
+        subplot(plotRows,plotCols,num-numStart+1)                               
+        plot(te,omega,'LineWidth',2)
+        hold on;
+        if plotSim
+            plot(tc,omega_sim,'LineWidth',2)
+        end
+        trial = num2str(num+1);
+        title(['Trial' ' ' trialCaption]);
+        xlabel('t (s)')
+        ylabel('ball velocity (deg/s)')
+
+        % Cart acceleration (acc): plot experimental versus simulation
+        set(groot,'CurrentFigure',ca);
+        subplot(plotRows,plotCols,num-numStart+1)                               
+        plot(te,acc,'LineWidth',2)
+        hold on;
+        if plotSim
+            plot(tc,acc_sim,'LineWidth',2)
+        end
+        trial = num2str(num+1);
+        title(['Trial' ' ' trialCaption]);
+        xlabel('t (s)')
+        ylabel('cart acceleration (m/s^2)')
+
+        % Ball acceleration (alpha): plot experimental versus simulation
+        set(groot,'CurrentFigure',ba);
+        subplot(plotRows,plotCols,num-numStart+1)                               
+        plot(te,alpha,'LineWidth',2)
+        hold on;
+        if plotSim
+            plot(tc,alpha_sim,'LineWidth',2)
+        end
+        trial = num2str(num+1);
+        title(['Trial' ' ' trialCaption]);
+        xlabel('t (s)')
+        ylabel('ball acceleration (deg/s^2)')
         
     end    
 
             % Insert trial number, fmin and optimized parameter values into array
-%         returnrow = num-numStart+1;
-%         trial = num+1;
-%         if fitMethod == "fitToAverage"
-%             returnrow = 1;
-%             trial = NaN; 
-%         end
+        returnrow = num-numStart+1;
+        trial = num+1;
+        if fitMethod == "fitToAverage"
+            returnrow = 1;
+            trial = NaN; 
+        end
 
         % Fill array with best-fit optimization parameters
 %         if optimizationType == "input shaping 4 impulse"

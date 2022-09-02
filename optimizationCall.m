@@ -17,7 +17,7 @@ numEnd      = 49;
 % Choose blocks to loop through. The 11 acceptable subjects 
 % correspond to blocks 1-22. All blocks would be 1 to 28.
 blockStart  = 1;
-blockEnd    = 1;
+blockEnd    = 2;
 
 % Set range of additional duration values to simulate trials before trimming
 delayMin = 0;       % [sec]

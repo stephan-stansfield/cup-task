@@ -2,131 +2,145 @@ function folder = simulationFolder(count)
        
     % 1. Original Input Shaping (No Impedance Model)
     if count == 1
-        folder = "1. Original Input Shaping"
+        folder = '01. Original Input Shaping'
     
-    % 2. Multi-Mode Input Shaping, FF:
+    % 2. Multi-Mode Input Shaping, no FF:
     elseif count == 2
-        folder = "2. Multi-Mode, Feedforward"
+        folder = '02. Multi-Mode Internal Model Without Feedforward'
         
-    % 3. No Impedance IS, FF:
+    % 3. Slow-Mode IS, no FF:
     elseif count == 3
-        folder = "3. No Impedance Simplification, Feedforward"
+        folder = '03. Slow-Mode Internal Model Without Feedforward'
         
-    % 4. Rigid Body IS, FF:
+    % 4. Fast-Mode IS, no FF:
     elseif count == 4
-        folder = "4. Rigid Body Simplification, Feedforward"
+        folder = '04. Fast-Mode Internal Model Without Feedforward'
         
-    % 5. Slow Mode IS, FF:
+    % 5. Rigid-Body IS, no FF:
     elseif count == 5
-        folder = "5. Slow Mode Simplification, Feedforward"
+        folder = '05. Rigid-Body Internal Model Without Feedforward'
     
-    % 6. Fast Mode IS, FF:
+    % 6. No-Impedance IS, no FF:
     elseif count == 6
-        folder = "6. Fast Mode Simplification, Feedforward"
+        folder = '06. No-Impedance Internal Model Without Feedforward'
         
-    % 7. Multi-Mode Input Shaping, No FF:
+    % 7. Multi-Mode Input Shaping with FF:
     elseif count == 7
-        folder = "7. Multi-Mode, No Feedforward"
+        folder = '07. Multi-Mode Internal Model With Feedforward'
         
-    % 8. No Impedance IS, No FF:
+    % 8. Slow-Mode IS with FF:
     elseif count == 8
-        folder = "8. No Impedance Simplification, No Feedforward"
+        folder = '08. Slow-Mode Internal Model With Feedforward'
         
-    % 9. Rigid Body IS, No FF:
+    % 9. Fast-Mode IS with FF:
     elseif count == 9
-        folder = "9. Rigid Body Simplification, No Feedforward"
+        folder = '09. Fast-Mode Internal Model With Feedforward'
     
-    % 10. Slow Mode IS, No FF:
+    % 10. Rigid-Body IS with FF:
     elseif count == 10
-        folder = "10. Slow Mode Simplification, No Feedforward"
+        folder = '10. Rigid-Body Internal Model With Feedforward'
     
-    % 11. Fast Mode IS, No FF:
+    % 11. No-Impedance IS with FF:
     elseif count == 11
-        folder = "11. Fast Mode Simplification, No Feedforward"    
+        folder = '11. No-Impedance Internal Model With Feedforward'    
         
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
     % 12. Submovements, No Impedance
     elseif count == 12
-        folder = "12. Submovements, No Impedance"
+        folder = '12. Submovements, No Impedance'
         
     % 13. Submovements, Impedance, Feedforward
     elseif count == 13
-        folder = "13. Submovements, Impedance, Feedforward"
+        folder = '13. Submovements, Impedance, Feedforward'
         
     % 14. Submovements, Impedance, No Feedforward
     elseif count == 14
-        folder = "14. Submovements, Impedance, No Feedforward"
+        folder = '14. Submovements, Impedance, No Feedforward'
         
     % 15. Rigid Body Simplification, Feedforward, Fixed Impedance            % K = 100, B = 10
     elseif count == 15
-        folder = "15. Rigid Body Simplification, Feedforward, Fixed Impedance"
+        folder = '15. Rigid Body Simplification, Feedforward, Fixed Impedance'
         
     % 16. Rigid Body Simplification, Feedforward, Fixed Impedance, 10k eval, 500ms delay            % K = 100, B = 10
     elseif count == 16
-        folder = "16. Rigid Body Simplification, Feedforward, Fixed Impedance, 10k eval, 500ms delay"
+        folder = '16. Rigid Body Simplification, Feedforward, Fixed Impedance, 10k eval, 500ms delay'
         
     % 17. Rigid Body Simplification, Feedforward, B=10, K=75-125, 10k eval, 500ms delay
     elseif count == 17
-        folder = "17. Rigid Body Simplification, Feedforward, B=10, K=75-125, 10k eval, 500ms delay"
+        folder = '17. Rigid Body Simplification, Feedforward, B=10, K=75-125, 10k eval, 500ms delay'
         
     % 18. Rigid Body Simplification, Feedforward, B=6-10, K=75-125, 10k eval, 500ms delay
     elseif count == 18
-        folder = "18. Rigid Body Simplification, Feedforward, B=6-10, K=75-125, 10k eval, 500ms delay"
+        folder = '18. Rigid Body Simplification, Feedforward, B=6-10, K=75-125, 10k eval, 500ms delay'
         
     % 19. Rigid Body Simplification, Feedforward, B=6-10, K=75-125, 10k eval, 500ms delay
     % This simulation calculated duration for the vel-duration correlation
     % based on the simulated duration, not the duration of the experimental
     % trial being fit
     elseif count == 19
-        folder = "19. Rigid Body Simplification, Feedforward, B=6-10, K=75-125, 10k eval, 500ms delay"
+        folder = '19. Rigid Body Simplification, Feedforward, B=6-10, K=75-125, 10k eval, 500ms delay'
         
     % 20. Rigid Body Simplification, Feedfwd, B=6-10, K=75-175, 10k eval, +500ms delay
     elseif count == 20
-        folder = "20. Rigid Body Simplification, Feedfwd, B=6-10, K=75-175, 10k eval, +500ms delay"
+        folder = '20. Rigid Body Simplification, Feedfwd, B=6-10, K=75-175, 10k eval, +500ms delay'
         
     elseif count == 21
-        folder = "21. Rigid Body Simplification, Feedfwd, B=6-10, K=75-175, 10k eval, 250-625ms delay"
+        folder = '21. Rigid Body Simplification, Feedfwd, B=6-10, K=75-175, 10k eval, 250-625ms delay'
         
     elseif count == 22
-        folder = "22. Rigid Body Simplification, FBO, B=6-10, K=75-175, 10k eval, +500ms delay"
+        folder = '22. Rigid Body Simplification, FBO, B=6-10, K=75-175, 10k eval, +500ms delay'
         
     elseif count == 23
-        folder = "23. Rigid Body Simplification, Feedforward, updated sim duration"
+        folder = '23. Rigid Body Simplification, Feedforward, updated sim duration'
         
     elseif count == 24
-        folder = "24. Rigid Body Simplification, Feedforward, B=6-20, K=0-250, +500ms delay"
+        folder = '24. Rigid Body Simplification, Feedforward, B=6-20, K=0-250, +500ms delay'
         
     elseif count == 25
-        folder = "25. Rigid Body Simplification, Feedforward, B=7-20, K=0-250, +500ms delay"
+        folder = '25. Rigid Body Simplification, Feedforward, B=7-20, K=0-250, +500ms delay'
         
     elseif count == 26
-%         folder = "26. Original Input Shaping 500ms"
-        folder = "1. Original Input Shaping"
+%         folder = '26. Original Input Shaping 500ms'
+        folder = '1. Original Input Shaping'
         
     elseif count == 27
-        folder = "27. Multi-Mode Input Shaping 500ms"
+        folder = '27. Multi-Mode Input Shaping 500ms'
         
     elseif count == 28
-        folder = "28. Rigid Body Simplification, Feedforward, B=7-20, K=0-250, +250ms delay"
+        folder = '28. Rigid Body Simplification, Feedforward, B=7-20, K=0-250, +250ms delay'
         
     elseif count == 29
-%         folder = "29. Rigid Body Simplification, Feedforward, B=0-50, K=0-750, +500ms delay"
-        folder = "28. Rigid Body Simplification, Feedforward, B=7-20, K=0-250, +250ms delay"
+%         folder = '29. Rigid Body Simplification, Feedforward, B=0-50, K=0-750, +500ms delay'
+        folder = '28. Rigid Body Simplification, Feedforward, B=7-20, K=0-250, +250ms delay'
         
     elseif count == 30
-        folder = "30. Multi-Mode Input Shaping, B=7-20, K=0-250, +250ms"
+        folder = '30. Multi-Mode Input Shaping, B=7-20, K=0-250, +250ms'
         
     elseif count == 31
-        folder = "31. Original Input Shaping 250ms"
+        folder = '31. Original Input Shaping 250ms'
+
+    elseif count == 32
+        folder = '32. Rigid Body Simplification, Feedforward, B=7.5-75, K=25-250, +250ms delay'
+
+    elseif count == 33
+        folder = '33. Rigid Body Simplification, Feedforward, B=7-20, K=0-250, +250ms delay'
+
+    elseif count == 34
+        folder = '34. Rigid Body Simplification, Feedforward, B=7-20, K=0-250, +250ms delay'
+
+    elseif count == 35
+        folder = '35. Rigid Body Simplification, Feedforward, B=7.5-75, K=25-250, +250ms delay'
         
     % 99. Experimental Trajectories
     elseif count == 99
         % For experimental trajectories folder name doesn't matter. This is
         % used by minVelPlot.m implementation
-        folder = "experiment"
+        folder = 'experiment'
         
     end
     
-    folder = strcat(folder, "/");
+    folder = strcat(folder, '/');
     
 end
 

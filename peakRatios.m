@@ -3,6 +3,7 @@
 %
 % Takes a velocity profile, identifies the amplitudes of its local maxima,
 % and calculates the asymmetry of the peaks.
+% (Replaces peakAsymmetry.m for naming clarity)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 close all;
@@ -43,23 +44,20 @@ plotCols = 10;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%% INITIALIZATION
-% Initialize array to hold velocity ratios
+% Initialize arrays to hold ratios by trial, and median ratio by subject
 velRatio = nan(trialStart-trialEnd+1, blockStart-blockEnd+1, simStart-simEnd+1);
+medianRatio = nan(simEnd,blockEnd/2);
 
 % Label for simulation type
 simLabels = {'IS', 'MM-NF', 'SM-NF', 'FM-NF', 'RB-NF', 'NI-NF', ...
     'MM-FF', 'SM-FF', 'FM-FF', 'RB-FF', 'NI-FF'};
-% , 'SB', 'SB-FF', 'SB-NF', 'RB-FF-FI',...
-%     'RB-FF-NI-10K', 'RB-FF-K-10K', 'RB-FF-B6.10-K75.125-10K',...
-%     'RB-FF-B6.10-K75.125-10K-dur', 'RB-FF-B6.10-K75.175', 'delay250-625',...
-%     'FBO','dur_corr','RB-FF-B6.20-K0.250-10K','RB-FF-B7.20-K0.250-10K',...
-%     '26. IS delay500', '27. MM delay500','28. RB-FF-B7.20-K0.250-10K-delay250',...
-%     '29. RB-FF-B0.50-K0.750-10K-delay500'};
 
 % Create table to hold median peak ratio values for each subject within a
 % simulation
-medianBySubject = {'Simulation Type'; 'S1'; 'S2'; 'S3'; 'S4'; 'S5'; 'S6';...
-    'S7'; 'S8'; 'S9'; 'S10'; 'S11'};
+medianBySubject = nan(simEnd,blockEnd/2);
+% {'Simulation Type'; 'S1'; 'S2'; 'S3'; 'S4'; 'S5'; 'S6';...
+%     'S7'; 'S8'; 'S9'; 'S10'; 'S11'};
+meanBySubject = nan(simEnd,blockEnd/2);
 
 statsByBlock = cell(4,23);
 statsByBlock(:,1) = {'Subject'; 'Mean Peak Ratio'; 'Median Peak Ratio';...
@@ -87,23 +85,8 @@ overallResults = {'Simulation Type';...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%% MAIN LOOP
             
-% Cycle through simulation types
+% Loop through simulation types
 for simNum = simStart:simEnd
-    
-    % 1. Nominal Input Shaping (No Impedance Model)
-    % 2. Multi-Mode Input Shaping, FF
-    % 3. No Impedance IS, FF
-    % 4. Rigid Body IS, FF
-    % 5. Slow Mode IS, FF
-    % 6. Fast Mode IS, FF
-    % 7. Multi-Mode Input Shaping, No FF
-    % 8. No Impedance IS, No FF
-    % 9. Rigid Body IS, No FF
-    % 10. Slow Mode IS, No FF
-    % 11. Fast Mode IS, No FF
-    % 12. Submovements, No Impedance
-    % 13. Submovements, Impedance, FF
-    % 14. Submovements, Impedance, No FF
     
     % Get name of folder holding best-fit simulations for selected
     % simulation type
@@ -112,6 +95,7 @@ for simNum = simStart:simEnd
         continue
     end
     
+    % Loop through blocks
     for blockNum = blockStart:blockEnd
         
         % Get information about experimental block
@@ -142,16 +126,6 @@ for simNum = simStart:simEnd
         % Loop through trials, calculating asymmetry of each one and
         % storing values in array
         for trialNum = trialStart:1:trialEnd
-            
-%             % DEBUG
-%             disp('Trial:')
-%             trialNum
-            
-%             % Skip invalid trials and vel vs. duration correlation outliers
-%             if ismember(trialNum,invalidTrials) || ismember(trialNum,minVelOutliers)
-%                 velRatio(trialNum,blockNum,simNum) = NaN;
-%                 continue
-%             end
             
             % Skip invalid trials
             if ismember(trialNum,invalidTrials)
@@ -222,9 +196,13 @@ for simNum = simStart:simEnd
         
         % Compute per-subject statistics for both blocks 3 & 4
         if ~mod(blockNum,2)
-            medianBySubject(1,simNum+1) = {simLabels(simNum)};
-            medianBySubject(int8(blockNum/2)+1,simNum+1) = ...
-                {median(velRatio(:,blockNum-1:blockNum,simNum),'all','omitnan')};
+%             medianBySubject(1,simNum+1) = {simLabels(simNum)};
+%             medianBySubject(int8(blockNum/2),simNum) = ...
+%                 {median(velRatio(:,blockNum-1:blockNum,simNum),'all','omitnan')};
+            medianBySubject(simNum,int8(blockNum/2)) = ...
+                median(velRatio(:,blockNum-1:blockNum,simNum),'all','omitnan');
+            meanBySubject(simNum,int8(blockNum/2)) = ...
+                mean(velRatio(:,blockNum-1:blockNum,simNum),'all','omitnan');
         end
         
         % Save figure contianing plots for block
@@ -245,29 +223,37 @@ for simNum = simStart:simEnd
     % Conduct t-test to determine if mean of peak ratio medians is
     % significantly different from 1 at 5%, 2%, & 1%  signifiance levels
     tail = 'both';
-    [h5,p5,ci,stats] = ttest(cell2mat(medianBySubject(2:12,simNum+1)),1,...
-        'Tail',tail)
+%     [h5,p5,ci,stats] = ttest(cell2mat(medianBySubject(simNum+1,:)),1,...
+%         'Tail',tail)
+    [h5,p5,ci,stats] = ttest(medianBySubject(simNum+1,:),1,'Tail',tail)
     
-    [h2,p2,ci,stats] = ttest(cell2mat(medianBySubject(2:12,simNum+1)),1,...
-        'Tail',tail,'Alpha',.02)
+%     [h2,p2,ci,stats] = ttest(cell2mat(medianBySubject(simNum+1,:)),1,...
+%         'Tail',tail,'Alpha',.02)
+    [h2,p2,ci,stats] = ttest(medianBySubject(simNum+1,:),1,'Tail',tail,'Alpha',.02)
 
-    [h1,p1,ci,stats] = ttest(cell2mat(medianBySubject(2:12,simNum+1)),1,...
-        'Tail',tail,'Alpha',.01)
+%     [h1,p1,ci,stats] = ttest(cell2mat(medianBySubject(simNum+1,:)),1,...
+%         'Tail',tail,'Alpha',.01)
+    [h1,p1,ci,stats] = ttest(medianBySubject(simNum+1,:),1,'Tail',tail,'Alpha',.01)
 
     % Calculate t-value manually for sanity check
 %     manualT = (mean(cell2mat(medianBySubject(2:end,simNum+1))) - 1)/...
 %         std(cell2mat(medianBySubject(2:end,simNum+1)),1,'all','omitnan')/sqrt(10);
     
     % Put total results for simulation type into table
-    overallResults(:,simNum-simStart+2) = {simLabels(simNum);...
+    overallResults(:,simNum-simStart+2) = ...
+        {simLabels(simNum);...
         median(velRatio(:,:,simNum),'all','omitnan');...
         mean(velRatio(:,:,simNum),'all','omitnan');...
         std(velRatio(:,:,simNum),1,'all','omitnan');...
-        mean(cell2mat(medianBySubject(2:end,simNum+1)));...
-        std(cell2mat(medianBySubject(2:end,simNum+1)),1,'all','omitnan');...
+%         mean(cell2mat(medianBySubject(simNum+1,:)));...
+%         std(cell2mat(medianBySubject(simNum+1,:)),1,'all','omitnan');...
+        mean(medianBySubject(simNum+1,:));...
+        std(medianBySubject(simNum+1,:),1,'all','omitnan');...
         h5; p5; h2; p2; h1; p1};
     
 end
+
+save('best fit simulation/peakRatioArrays.mat','medianBySubject','meanBySubject')
 
 % % Rigid-Body Simplification Specifically
 % rigidBodyVelRatios = velRatio(:,:,19);

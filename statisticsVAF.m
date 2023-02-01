@@ -1,12 +1,13 @@
 % statisticsVAF
 %
-% VAF implemented using same equation as Svinin et al (2019)
+% Calculates Variance Accounted For (VAF) using same equation as
+% Svinin et al (2019)
 
 clear all;
 close all;
 clc;
 
-tic
+tic % Time file execution
 
 addpath('data', 'trim times', genpath('experimental data'));
 st          = 0.001;                                                        % Simulation time step (s)
@@ -24,7 +25,7 @@ type = "all";
 justVel = true;
 
 % Choose whether to save generated statistics
-saveFile = false;
+saveFile = true;
 
 % Choose which experimental blocks to analyze (all acceptable blocks
 % would be 1-22)
@@ -37,18 +38,13 @@ numStart    = 1;
 numEnd      = 50;
 
 % Choose range of simulation types to analyze
-simStart = 31;
-simEnd = 31;
+simStart = 1;
+simEnd = 11;
 
 % Label for simulation type
-simLabels = {'IS', 'MM-FF', 'NI-FF', 'RB-FF', 'SM-FF', 'FM-FF', 'MM-NF',...
-    'NI-NF', 'RB-NF', 'SM-NF', 'FM-NF', 'SB', 'SB-FF', 'SB-NF', 'RB-FF-NI',...
-    'RB-FF-NI-10K', 'RB-FF-K-10K', 'RB-FF-B6.10-K75.125-10K',...
-    'RB-FF-B6.10-K75.125-10K-dur', 'RB-FF-B6.10-K75.175', 'delay250-625',...
-    'FBO','dur_corr','RB-FF-B6.20-K0.250-10K','RB-FF-B7.20-K0.250-10K',...
-    'IS-delay500', 'MM-FF-delay500', 'RB-FF-B7.20-K0.250-10K-delay250',...
-    'RB-FF-B0.50-K0.750-10K-delay500', 'MM-FF-B7.20-K0.250-10K-delay250',...
-    'IS-delay250'};
+simLabels = {'IS', 'MM-NF', 'SM-NF', 'FM-NF', 'RB-NF', 'NI-NF', ...
+    'MM-FF', 'SM-FF', 'FM-FF', 'RB-FF', 'NI-FF'};
+   
 
 % Create table to hold overall VAF mean and standard deviation values for
 % all simulations analyzed
@@ -60,24 +56,22 @@ meanVAF = nan(simEnd,blockEnd/2);
 sdevVAF = nan(simEnd,blockEnd/2);
 medianVAF = nan(simEnd,blockEnd/2);
 sdevMedianVAF = nan(simEnd,1);
+meanOfMedianVAF = nan(simEnd,1);
 
-% Cycle through simulation types
+% Loop through simulation types
 for simNum = simStart:simEnd
     
     % 1. Nominal Input Shaping (No Impedance Model)
-    % 2. Multi-Mode Input Shaping, FF
-    % 3. No Impedance IS, FF
-    % 4. Rigid Body IS, FF
-    % 5. Slow Mode IS, FF
-    % 6. Fast Mode IS, FF
-    % 7. Multi-Mode Input Shaping, No FF
-    % 8. No Impedance IS, No FF
-    % 9. Rigid Body IS, No FF
-    % 10. Slow Mode IS, No FF
-    % 11. Fast Mode IS, No FF
-    % 12. Submovements, No Impedance
-    % 13. Submovements, Impedance, FF
-    % 14. Submovements, Impedance, No FF
+    % 2. Multi-Mode Input Shaping, no FF
+    % 3. Slow Mode IS, no FF
+    % 4. Fast Mode IS, no FF
+    % 5. Rigid Body IS, no FF
+    % 6. No Impedance IS, no FF
+    % 7. Multi-Mode Input Shaping, FF
+    % 8. Slow Mode IS, FF
+    % 9. Fast Mode IS, FF
+    % 10. Rigid Body IS, FF
+    % 11. No Impedance IS, FF
     
     % Get name of folder holding best-fit simulations for selected
     % simulation type
@@ -144,6 +138,7 @@ for simNum = simStart:simEnd
         simulationSDAlpha = nan(1,numBlocks);
     end
     
+    % Loop through blocks
     for blockNum = blockStart:blockEnd
 
         % Get information about experimental block
@@ -209,7 +204,8 @@ for simNum = simStart:simEnd
             accSim      = simProfiles(:,6);
             alphaSim    = simProfiles(:,7);
             
-            % Trim experimental and simulated trajectories to same duration
+            % Trim experimental and simulated trajectories to same
+            % duration, using shorter duration of the two
             if tdes > tdesSim
                 len = int16(tdesSim/st+1);
                 pos = pos(1:len);
@@ -282,7 +278,7 @@ for simNum = simStart:simEnd
 
         end
         
-        % Take mean VAF value for one block
+        % Calculate mean VAF value for one block
         blockAvgVAFVel(blockNum) = mean(VAFVel(:,blockNum),'omitnan');
         if ~justVel
             blockAvgVAFPos(blockNum) = mean(VAFPos(:,blockNum),'omitnan');
@@ -292,7 +288,7 @@ for simNum = simStart:simEnd
             blockAvgVAFAlpha(blockNum) = mean(VAFAlpha(:,blockNum),'omitnan');
         end
         
-        % Take mean and median VAF values for one subject across both blocks
+        % Calulate mean and median VAF values for one subject across both blocks
         if ~mod(blockNum,2)
             subjAvgVAFVel(blockNum) = mean(blockAvgVAFVel(blockNum-1:blockNum),'omitnan');
             meanVAF(simNum,blockNum/2) = subjAvgVAFVel(blockNum);
@@ -336,9 +332,9 @@ for simNum = simStart:simEnd
                 subjSDOmega(blockNum) = NaN;
                 subjSDAlpha(blockNum) = NaN;
             end
-        end
-        
+        end  
     end
+    % End looping through blocks
     
     % Calculate mean VAF for all trials run using current simulation
     simulationAvgVAFVel(1) = mean(VAFVel,'all','omitnan');
@@ -360,8 +356,7 @@ for simNum = simStart:simEnd
         subjAvgSDAlpha(1) = mean(subjSDAlpha,'all','omitnan');
     end
     
-    % Calculate standard deviation for all trials run using current
-    % simulation
+    % Calculate standard deviation for all trials run using current simulation
     simulationSDVel(1) = std(VAFVel,1,'all','omitnan');
     if ~justVel
         simulationSDPos(1) = std(VAFPos,1,'all','omitnan');
@@ -371,14 +366,13 @@ for simNum = simStart:simEnd
         simulationSDAlpha(1) = std(VAFAlpha,1,'all','omitnan');
     end
     
-    %%
     % Calculate mean and standard deviation of subject median VAFs
-    meanOfMedianVAF = mean(medianVAF(simNum,:));
+    meanOfMedianVAF(simNum) = mean(medianVAF(simNum,:));
     sdevMedianVAF(simNum) = std(medianVAF(simNum,:));
     
     % Add values to table saving mean & SD for all simulations
     overallResults(:,simNum-simStart+2) = {simLabels(simNum);...
-        simulationAvgVAFVel(1);simulationSDVel(1);meanOfMedianVAF(1);...
+        simulationAvgVAFVel(1);simulationSDVel(1);meanOfMedianVAF(simNum);...
         sdevMedianVAF(simNum)};
     
     if saveFile
@@ -445,20 +439,18 @@ for simNum = simStart:simEnd
                 fileName = strcat("best fit simulation/",parentFolder,"/_Statistics/", paramName, " R Squared - ",parentFolder,"2022-01-14.xlsx");
                 writetable(outputTable,fileName,'WriteRowNames',true);    
             end
-            
-            resultsTable = cell2table(overallResults);
-            writetable(resultsTable,"best fit simulation/overall VAFs.xlsx",'WriteVariableNames',false);
         end
         
-    end
-    
-    % After running through all simulations, save tables
-    if saveFile
-        save('best fit simulation/VAFarrays.mat','meanVAF','sdevVAF')
+    % Save results in excel table and .mat file
+    resultsTable = cell2table(overallResults);
+    writetable(resultsTable,"best fit simulation/overall VAFs.xlsx",'WriteVariableNames',false);
+    save('best fit simulation/VAFarrays.mat','meanVAF','sdevVAF', 'medianVAF', 'sdevMedianVAF')
+
     end
     
 end
 
+%{
 % Statistics
 % original_medians = medianVAF(26,:);
 multimode_medians = medianVAF(30,:);
@@ -475,4 +467,6 @@ rigid_body_medians = medianVAF(29,:);
 % % Check if multi-mode input shaping VAF is significantly is significantly
 % % higher than original input shaping VAF
 % [T, sig5, s25, s1] = sigDiffPaired(multimode_medians, original_medians)
-        
+%}
+
+toc

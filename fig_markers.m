@@ -3,7 +3,7 @@
 % Create a figure displaying the mean VAF for different simulation types as
 % well as error bars
 
-C = readcell('data analysis/VAF summary 2022-11-21.xlsx');          % simulations for SfN 2022 poster
+C = readcell('data analysis/VAF summary 2022-10-17.xlsx');                  % simulations for SfN 2022 poster
 
 % Read all columns:
 x = C(1,2:end);                     % x-axis labels
@@ -27,46 +27,36 @@ titleFontSize = 26;
 labelFontSize = 24;
 axisFontSize = 16;
 legendFontSize = 20;
-marSz = 150;                % Size of scatter plot markers
+marSz = 500;                % Size of scatter plot markers
 % markerList = ['o', '*', 'x', 's'];
 % % colorList = ['r','b','g'];
 % colorList = {[0 0 0], [215 20 20]/256,...
 %     [68 114 196]/256, [0.560181 0.691569 0.194885], [41 196 44]/256};
 % plotObjects = {};
 % 
-yellow = [0.9290 0.6940 0.1250];        % MATLAB default yellow
-blue = [0, 0.4470, 0.7410];             % MATLAB default blue
+orange = [0.9290 0.6940 0.1250];        % MATLAB default orange
 green = [0.4660 0.6740 0.1880];         % MATLAB default green
 
 % Assign specific colors and markers to different simulation categories
 colorList = {   [0 0 0],...                                     % Original input shaping
-                blue, blue, blue, blue, blue,...        % No feedforward
+                orange, orange, orange, orange, orange,...     % No feedforward
                 green, green, green, green, green};     % Feedforward
 
-markerList = [  "pentagram",...                         % Original input shaping
-                "diamond",...                           % Multi-mode input shaping
-                "v",...                                 % Slow mode internal model
-                "^",...                                 % Fast mode internal model
-                "square",...                            % No impedance internal model (pendulum mode)
-                "o",...                                 % Rigid body internal model (hand impedance mode)
-                "diamond", "v", "^", "square","o"];     % Repeat for feedforward
+markerList = [  "x",...                         % Human subject data
+                "pentagram",...                 % Original input shaping
+                "diamond",...                   % Multi-mode input shaping
+                'v',...                         % Slow mode internal model
+                '^',...                         % Fast mode internal model
+                'o',...                         % No impedance internal model (pendulum mode)
+                "square"];                      % Rigid body internal model (hand impedance mode)
+%                 'v', '^', 'o', "square"];       % Repeat for feedforward
 
 figure();
-for i=1:length(X)
-    barObjects{i} = errorbar(X(i), u(i), s(i), 'LineStyle','none','LineWidth',2);
+% First plot markers and legend
+for i=1:length(markerList)
+    plotObjects{i} = scatter(X(i),u(i),marSz,'Marker',markerList(i),...
+        'MarkerEdgeColor',[0 0 0], 'MarkerFaceColor',[0 0 0],'LineWidth',2)
     hold on;
-    markerObjects{i} = scatter(X(i),u(i),marSz,'Marker',markerList(i));
-    % this lines uses the default MATLAB color order for markers:
-%     set(markerObjects{i}, 'MarkerFaceColor', get(markerObjects{i},'MarkerEdgeColor')); 
-    % this line uses assigned colors from colorList for markers:
-    set(markerObjects{i},'MarkerEdgeColor',colorList{i}, 'MarkerFaceColor',colorList{i});
-    
-    % use default MATLAB color order for bars:
-%     set(barObjects{i}, 'Color', get(markerObjects{i},'CData'));
-    % use assigned color from colorList:
-    set(barObjects{i}, 'Color', colorList{i});
-    % put black border on markers:
-    set(markerObjects{i}, 'MarkerEdgeColor', 'black', 'LineWidth',1);
 end
 
 % % Without explicitly choosing markers & colors:
@@ -80,12 +70,12 @@ end
 set(gca,'FontSize',axisFontSize)
 xlabel('Simulation  Type','FontSize',labelFontSize);
 ylabel('Mean of Median VAF (%)','FontSize',labelFontSize);
-ylim([0, 102.5])
-set(gcf, 'Position',  [100, 100, 700, 600])
+% ylim([0, 102.5])
+% set(gcf, 'Position',  [100, 100, 700, 600])
 
 th = title('Variance Accounted For by Simulation Type','FontSize',titleFontSize,'FontWeight','Normal');
 titlePos = get(th, 'position');
-titlePos(2) = 105;   % Move title up slightly to accomodate adding significance asterisks to figure
+titlePos(2) = 105;   % Move title up slightly to accomodate adding significance askterisks to figure
 set(th, 'position', titlePos)
 
 % % Don't show data labels on x-axis; put in legend instead
@@ -94,15 +84,9 @@ set(gca,'xticklabel',[])
 % legend([plotObjects{1} plotObjects{2} plotObjects{3}], x(1:3),...
 %     'Location','southeast','FontSize',legendFontSize)
 
-% % 4 items:
+% 4 items:
 % legend([plotObjects{1} plotObjects{2} plotObjects{3} plotObjects{4}], x(1:4),...
 %     'Location','southeast','FontSize',legendFontSize)
 
-% % 6 items:
-% legend([markerObjects{1} markerObjects{2} markerObjects{3} markerObjects{4},...
-%     markerObjects{5} markerObjects{6}], x(1:6),...
-%     'Location','southeast','FontSize',legendFontSize)
-
 hold off;
-
 

@@ -41,10 +41,10 @@ function optimization(blockNum,optimizationType,modelStr,forwardF,timeMod,...
 
 % Set variable values (note that constants for gravity, physical system 
 % mass, and length are defined in globalData.m)
-Bmin        = 7;                                                            % Minimum damping value (N*s/m)
-Bmax        = 20;                                                           % Maximum damping value (N*s/m)
+Bmin        = 7.5;                                                            % Minimum damping value (N*s/m)
+Bmax        = 75;                                                           % Maximum damping value (N*s/m)
 Kmin        = 0;                                                            % Minimum  stiffness value (N/m)
-Kmax        = 250;                                                          % Maximum stiffness value (N/m)
+Kmax        = 750;                                                          % Maximum stiffness value (N/m)
 st          = 0.001;                                                        % Simulation time step (s)
 tDesMax     = 0;                                                            % Initialize maximum time duration
 
@@ -57,15 +57,13 @@ tDesMax     = 0;                                                            % In
 %     algorithm = NLOPT_GN_ISRES;                                         % ISRES (Improved Stochastic Ranking Evolution Strategy)
 %     algorithm = NLOPT_GN_ESCH;                                          % ESCH (evolutionary algorithm)
     
-% Run main program for selected experimental block and
-% simulation settings
+% Run main program for selected experimental block and simulation settings
 % Get information about experimental block
 [subjNum, subjStr, trialDate, trialStr, blockStr, ~, ~,invalidTrials] = ...
     blockDictionary(blockNum);
 disp('Experimental Block: ')
 disp([subjStr,trialDate,trialStr,blockStr])
 
-% DEBUG
 disp(subjNum)
     
 % SAVEPEAKS
@@ -84,6 +82,7 @@ if fitMethod == "fitToAverage"
     plotInd = true;
 end
 
+% To plot an individual trial
 if plotInd
    % Choose specific trial number to plot
    trialNumber = 25;     % Index trial number starting from 1
@@ -179,27 +178,22 @@ if plotInd
     cv = get(gcf,'Number');
 else
     cp = figure('Name','Cart position','units','normalized','outerposition',[0 0 1 1]);
-%     cp = get(gcf,'Number');
-%     cp = get(gcf);
+    set(cp,'DefaultFigureVisible','off');
 
-    % Set up data queue to fetch results during parallel optimization
-    D = parallel.pool.DataQueue;
-    D.afterEach(@(d) updateFigure(cp, d));
+    bp = figure('Name','Ball angle','units','normalized','outerposition',[0 0 1 1]);
+    set(bp,'DefaultFigureVisible','off');
 
-    figure('Name','Ball angle','units','normalized','outerposition',[0 0 1 1]);
-    bp = get(gcf,'Number');
+    cv = figure('Name','Cart velocity','units','normalized','outerposition',[0 0 1 1]);
+    set(cv,'DefaultFigureVisible','off');
 
-    figure('Name','Cart velocity','units','normalized','outerposition',[0 0 1 1]);
-    cv = get(gcf,'Number');
+    bv = figure('Name','Ball angular velocity','units','normalized','outerposition',[0 0 1 1]);
+    set(bv,'DefaultFigureVisible','off');
 
-    figure('Name','Ball angular velocity','units','normalized','outerposition',[0 0 1 1]);
-    bv = get(gcf,'Number');
+    ca = figure('Name','Cart acceleration','units','normalized','outerposition',[0 0 1 1]);
+    set(ca,'DefaultFigureVisible','off');
 
-    figure('Name','Cart acceleration','units','normalized','outerposition',[0 0 1 1]);
-    ca = get(gcf,'Number');
-
-    figure('Name','Ball angular acceleration','units','normalized','outerposition',[0 0 1 1]);
-    ba = get(gcf,'Number');
+    ba = figure('Name','Ball angular acceleration','units','normalized','outerposition',[0 0 1 1]);
+    set(ba,'DefaultFigureVisible','off');
 end
 
 % Initialize persistent variable array holding evaluation count for all trials
@@ -209,8 +203,6 @@ end
 % profiles
 nameStr = string(datetime('now','Format','yyyy-MM-dd_HH-mm-ss'));
 topFolderStr = strcat("data/", modelStr, "/");
-% folderStr = strcat("data/", modelStr, "/", subjStr,trialDate,trialStr, "/");
-% folderStr = erase(folderStr, "_trial_");
 folderStr = strcat("data/",modelStr,"/",subjNum,"_B",block3or4,"/");
 mkdir(folderStr, "best-fit profiles");
 
@@ -225,10 +217,8 @@ relative_stop = 0.00001;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % NLOPT FUNCTION
-    function [xopt, fmin] = NLopt(tc, tdes,xEnd,vStart,vEnd,pendIndex,...
-            pos,vel,acc,theta,omega,alpha,num,cp,cv,ca,bp,bv,ba,algorithm,setMaxEval)
-% function NLopt(tc, tdes,xEnd,vStart,vEnd,pendIndex,pos,vel,acc,theta,omega,...
-%         alpha,num,cp,cv,ca,bp,bv,ba,algorithm,setMaxEval)
+function [xopt, fmin] = NLopt(tc, tdes,xEnd,vStart,vEnd,pendIndex,...
+        pos,vel,acc,theta,omega,alpha,num,algorithm,setMaxEval)
     
     % Set optimization algorithm
     opt.algorithm = algorithm;
@@ -315,9 +305,6 @@ relative_stop = 0.00001;
 
     % Maximum number of evaluations before stopping the algorithm
     opt.maxeval = setMaxEval;
-
-    % DEBUG: try setting verbose output
-    opt.verbose = 1;
 
     % Run NLopt algorithm
     % @xopt: optimal values of the optimization hyperparameters
@@ -531,17 +518,11 @@ else
         tc=0:st:tDesMax;
 
         %%% Run optimization. Fit values to selected experimental trial. %%%
-        % Parallel version:
         [xopt, fmin] = feval(NLoptHandle,tc,tdes,xEnd,vStart,vEnd,...
-            pendIndex,pos,vel,acc,theta,omega,alpha,num,cp,cv,ca,bp,bv,...
-            ba,algorithm,setMaxEval);
-%         feval(NLoptHandle,tc,tdes,xEnd,vStart,vEnd,pendIndex,pos,vel,acc,...
-%             theta,omega,alpha,num,cp,cv,ca,bp,bv,ba,algorithm,setMaxEval,returnArray);
+            pendIndex,pos,vel,acc,theta,omega,alpha,num,algorithm,setMaxEval);
 
-        % Store best-fit parameters in array to be accessed outside
-        % parfor-loop
-%         xopt_array{num+1,1} = xopt;
-%         xopt_array{num+1,1} = fmin;
+        % Store best-fit parameters and objective function value in array 
+        % to be accessed outside parfor-loop
         xopt_array(num+1,:) = {xopt, fmin}
 
     end
@@ -614,16 +595,15 @@ for num = numStart:numEnd
     numStr = num2str(num);
     fileStr = strcat(subjStr,trialDate,trialStr,numStr);
     
-    % Parallel version:
-    structTrial = load(fileStr,'pos','theta','vel','omega','acc','alpha','t');
-    pos = structTrial.pos;
-    theta = structTrial.theta;
-    vel = structTrial.vel;
-    omega = structTrial.omega;
-    acc = structTrial.acc;
-    alpha = structTrial.alpha;
-    t = structTrial.t;
-    
+    load(fileStr,'pos','theta','vel','omega','acc','alpha','t');
+%     structTrial = load(fileStr,'pos','theta','vel','omega','acc','alpha','t');
+%     pos = structTrial.pos;
+%     theta = structTrial.theta;
+%     vel = structTrial.vel;
+%     omega = structTrial.omega;
+%     acc = structTrial.acc;
+%     alpha = structTrial.alpha;
+%     t = structTrial.t;
 
     % Load start and stop indices of corresponding trial. Note that trials
     % are indexed from 0, so add 1 to access correct row in array.
@@ -639,7 +619,7 @@ for num = numStart:numEnd
     xEnd = pos(end);
     vStart = vel(1);
     vEnd = vel(end);
-    pendIndex = find(vel > 0.1, 1);                                     % The first time index that cart velocity surpasses 0.1 m/s
+    pendIndex = find(vel > 0.1, 1); % The first time index when cart velocity surpasses 0.1 m/s
 
     % Extend time vector to maximum delayed size. All time vectors will
     % be the same length, so shorter trials will be padded.
@@ -647,8 +627,8 @@ for num = numStart:numEnd
     tc=0:st:tDesMax;
 
     % Translate optimization time parameters to actual times in seconds
-%     optTdelay   = 0.5*(optTcount-1)*delayMax;
-    optTdelay   = (optTcount-2)*delayMax;
+    optTdelay   = 0.5*(optTcount-1)*delayMax; % Range from delayMin to delayMax
+%     optTdelay   = (optTcount-2)*delayMax;     % Range from -delayMax to +delayMax (MARK FOR DELETION)
     tdessim     = tdes + optTdelay;
     if optimizationType == "input shaping 4 impulse"
         optShift    = shift*[optP-2,optQ-2,optR-2,optS-2];
@@ -733,7 +713,6 @@ for num = numStart:numEnd
     lensim = length(vel_sim);
     lenexp = length(pos);
     lentc  = length(tc);
-    
     if lensim ~= lenexp
         smaller = min(lensim,lenexp);
 
@@ -764,33 +743,30 @@ for num = numStart:numEnd
     vrmse       = sqrt((1/length(squareVel))*sum(squareVel));
     
     % Insert trial number, fmin and optimized parameter values into array
-    returnrow = num-numStart+1;
+    returnRow = num-numStart+1;
     trial = num+1;
     if fitMethod == "fitToAverage"
-        returnrow = 1;
+        returnRow = 1;
         trial = NaN; 
     end
 
-%     % DEBUG
-%     disp('Size of evals: ')
-%     disp(size(evals))
-
-%     if optimizationType == "input shaping 4 impulse"
-%         returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK,...
-%             optShift,optTdelay, optA11, optA12, optA21, optA11, sub1End,...
-%             sub2Start, evals(num+1), opt.xtol_rel];
-%     elseif optimizationType == "input shaping 2 impulse impedance"
-%         returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK,...
-%             optShift, optTdelay, optA1, optA2, sub1End, sub2Start,...
-%             evals(num+1), opt.xtol_rel];
-%     elseif optimizationType == "input shaping 2 impulse no impedance"
-%         returnArray(returnrow,:) = [trial, fmin, vrmse, optShift,...
-%             optTdelay, optA1, optA2, sub1End, sub2Start, evals(num+1),...
-%             opt.xtol_rel];
-%     elseif optimizationType == "submovement"
-%         returnArray(returnrow,:) = [trial, fmin, vrmse, optB, optK, optD,...
-%             optt1, optt2, optTdelay, evals(num+1), opt.xtol_rel];
-%     end
+    % Fill array with best-fit optimization parameters
+    if optimizationType == "input shaping 4 impulse"
+        returnArray(returnRow,:) = [trial, fmin, vrmse, optB, optK,...
+            optShift,optTdelay, optA11, optA12, optA21, optA11, sub1End,...
+            sub2Start, 0, relative_stop];
+    elseif optimizationType == "input shaping 2 impulse impedance"
+        returnArray(returnRow,:) = [trial, fmin, vrmse, optB, optK,...
+            optShift, optTdelay, optA1, optA2, sub1End, sub2Start,...
+            0, relative_stop];
+    elseif optimizationType == "input shaping 2 impulse no impedance"
+        returnArray(returnRow,:) = [trial, fmin, vrmse, optShift,...
+            optTdelay, optA1, optA2, sub1End, sub2Start, 0,...
+            relative_stop];
+    elseif optimizationType == "submovement"
+        returnArray(returnRow,:) = [trial, fmin, vrmse, optB, optK, optD,...
+            optt1, optt2, optTdelay, 0, relative_stop];
+    end
     
     % Save best-fit output to a spreadsheet    
     dur_corr_vector = zeros(length(vel_sim),1);
@@ -800,7 +776,7 @@ for num = numStart:numEnd
         'Cart Vel [m/s]','Ball Ang Vel [deg/s]', 'Cart Acc [m/s^2]',...
         'Ball Ang Acc [deg/s^2]', 'Pre-Trim Duration [s]'};
     ProfileT = array2table(outputArray,'VariableNames',profileVariables);
-    trialNumStr = num2str(returnrow);
+    trialNumStr = num2str(returnRow);
     fileName = strcat(folderStr, "/best-fit profiles/", trialNumStr, ".xlsx");
     writetable(ProfileT,fileName);
     
@@ -1032,40 +1008,14 @@ for num = numStart:numEnd
         
     end    
 
-            % Insert trial number, fmin and optimized parameter values into array
-        returnrow = num-numStart+1;
-        trial = num+1;
-        if fitMethod == "fitToAverage"
-            returnrow = 1;
-            trial = NaN; 
-        end
-
-        % Fill array with best-fit optimization parameters
-%         if optimizationType == "input shaping 4 impulse"
-%             returnArray(num+1,:) = [trial, fmin, vrmse, optB, optK,...
-%                 optShift,optTdelay, optA11, optA12, optA21, optA11, sub1End,...
-%                 sub2Start, 0, relative_stop];
-        if optimizationType == "input shaping 2 impulse impedance"
-            returnArray(num+1,:) = [trial, fmin, vrmse, optB, optK,...
-                optShift, optTdelay, optA1, optA2, sub1End, sub2Start,...
-                0, relative_stop];
-%         elseif optimizationType == "input shaping 2 impulse no impedance"
-%             returnArray(num+1,:) = [trial, fmin, vrmse, optShift,...
-%                 optTdelay, optA1, optA2, sub1End, sub2Start, 0,...
-%                 relative_stop];
-%         elseif optimizationType == "submovement"
-%             returnArray(num+1,:) = [trial, fmin, vrmse, optB, optK, optD,...
-%                 optt1, optt2, optTdelay, 0, relative_stop];
-        end
-
-%         % Get number of evaluations after optimization
-%         G = globalData();
-%         evals = G.evalCount;
-%         disp(evals)
+%     % Get number of evaluations after optimization
+%     G = globalData();
+%     evals = G.evalCount;
+%     disp(evals)
 % 
-%         % Print trial number and total evaluation count
-%         disp(['Trial: ',num2str(num+1)])
-%         disp(['Number of evaluations: ', num2str(evals(num+1))])
+%     % Print trial number and total evaluation count
+%     disp(['Trial: ',num2str(num+1)])
+%     disp(['Number of evaluations: ', num2str(evals(num+1))])
 
 end
 
@@ -1266,30 +1216,42 @@ if plotInd
     saveas(cv, strcat(folderStr, "cart_vel_", nameStr, ".png"));
     saveas(cv, strcat(topFolderStr, "cart_vel_", nameStr, ".png"));         % Save velocity profile into top-level folder as well
 else
-    set(groot,'CurrentFigure',cp);
+%     set(groot,'CurrentFigure',cp);
+%     set(cp,'DefaultFigureVisible','on');
     figTitle = ['Experimental vs Best Fit Cart Position Profiles,' ' ' subjStr trialDate];
-    sgtitle(figTitle,'FontSize',16)
+%     sgtitle(figTitle,'FontSize',16)
+    sgtitle(cp,figTitle,'FontSize',16)
     
-    set(groot,'CurrentFigure',bp);
+%     set(groot,'CurrentFigure',bp);
+%     set(bp,'DefaultFigureVisible','on');
     figTitle = ['Experimental vs Best Fit Ball Angle Profiles,' ' ' subjStr trialDate];
-    sgtitle(figTitle,'FontSize',16)
+%     sgtitle(figTitle,'FontSize',16)
+    sgtitle(bp,figTitle,'FontSize',16)
 
-    set(groot,'CurrentFigure',cv);
+%     set(groot,'CurrentFigure',cv);
+%     set(cv,'DefaultFigureVisible','on');
     figTitle = ['Experimental vs Best Fit Cart Velocity Profiles: Subject ', subjNum, ' Block ', block3or4 ];
 %     figTitle = ['Hand Velocity Minima & Maxima: Subject ', subjNum, ' Block ', block3or4 ];
-    sgtitle(figTitle,'FontSize',16)
+%     sgtitle(figTitle,'FontSize',16)
+    sgtitle(cv,figTitle,'FontSize',16)
 
-    set(groot,'CurrentFigure',bv);
+%     set(groot,'CurrentFigure',bv);
+%     set(bv,'DefaultFigureVisible','on');
     figTitle = ['Experimental vs Best Fit Ball Angular Velocity Profiles,' ' ' subjStr trialDate];
-    sgtitle(figTitle,'FontSize',16)
+%     sgtitle(figTitle,'FontSize',16)
+    sgtitle(bv,figTitle,'FontSize',16)
 
-    set(groot,'CurrentFigure',ca);
+%     set(groot,'CurrentFigure',ca);
+%     set(ca,'DefaultFigureVisible','on');
     figTitle = ['Experimental vs Best Fit Cart Acceleration Profiles,' ' ' subjStr trialDate];
-    sgtitle(figTitle,'FontSize',16)
+%     sgtitle(figTitle,'FontSize',16)
+    sgtitle(ca,figTitle,'FontSize',16)
 
-    set(groot,'CurrentFigure',ba);
+%     set(groot,'CurrentFigure',ba);
+%     set(ba,'DefaultFigureVisible','on');
     figTitle = ['Experimental vs Best Fit Ball Angular Acceleration Profiles,' ' ' subjStr trialDate];
-    sgtitle(figTitle,'FontSize',16)
+%     sgtitle(figTitle,'FontSize',16)
+    sgtitle(ba,figTitle,'FontSize',16)
 
     saveas(cp, strcat(folderStr, "cart_pos_", nameStr, ".png"))      
     saveas(bp, strcat(folderStr, "ball_angle_", nameStr, ".png"))      

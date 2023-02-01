@@ -32,10 +32,10 @@ pBySubject(1,2) = {'Experimental'};
 pairs = true;
 
 % Choose whether to save figures (Note: "pairs" must also be true)
-save = false;
+save = true;
 
 if save
-    saveFolder = strcat("best fit simulation/0. Experimental Trials/_Experimental Min Velocity Correlation/");
+    saveFolder = strcat("best fit simulation/00. Experimental Trials/_Experimental Min Velocity Correlation/");
     pngSuffix = ".png";
 end
 
@@ -152,9 +152,9 @@ for blockNum = 1:22
 
 end
 
-title(subplotFig,'Experimental Data, Blocks 3 & 4','FontSize',titleFontSize)
+title(subplotFig,'Human Subject Data','FontSize',titleFontSize)
 xlabel(subplotFig,'Movement Duration (s)','FontSize',labelFontSize);
-ylabel(subplotFig,'Interpeak Minimum Velocity (m/s)','FontSize',labelFontSize);
+ylabel(subplotFig,'Inte-peak Minimum Velocity (m/s)','FontSize',labelFontSize);
 
 
 if pairs && save

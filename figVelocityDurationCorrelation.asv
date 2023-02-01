@@ -1,4 +1,4 @@
-% minVelPlot
+% figVelocityDurationCorrelation (previously minVelPlot)
 %
 % Takes a block of kinematic trajectories and plots the values of the
 % inter-peak velocity "dip" against the duration of the trajectory.
@@ -13,12 +13,12 @@ clc;
 addpath('data', 'trim times', genpath('experimental data'));
 
 % Choose whether to plot simulated (true) or experimental (false) results
-plots = false; % whether to plot figures at all
+plots = true; % whether to plot figures at all
 plotSim = true;
 
 % Label for data type (experimental or type of simulation)
-dataLabels = {'IS', 'MM-FF', 'NI-FF', 'RB-FF', 'SM-FF', 'FM-FF', 'MM-NF',...
-    'NI-NF', 'RB-NF', 'SM-NF', 'FM-NF'};
+dataLabels = {'IS', 'MM-NF', 'SM-NF', 'FM-NF', 'RB-NF', 'NI-NF', ...
+    'MM-FF', 'SM-FF', 'FM-FF', 'RB-FF', 'NI-FF'};
 %     'SB', 'SB-FF', 'SB-NF', 'RB-FF-FI', ...
 %     'RB-FF-NI-10K', 'RB-FF-K-10K', 'RB-FF-B6.10-K75.125-10K', 'Test', ...
 %     'RB-FF-B6.10-K75.125-10K_corr', 'RB-FF-B6.10-K75.175', 'delay250-625',...
@@ -35,7 +35,7 @@ pBySubject = {'Data Type'; 'S1'; 'S2'; 'S3'; 'S4'; 'S5'; 'S6';...
 overallResults = zeros(2,11,11);
 
 % Choose range of simulation types to analyze
-simStart = 1;
+simStart = 2;
 simEnd = 11;
 
 % Choose range of experimental trials to visualize
@@ -302,8 +302,9 @@ for simNum = simStart:simEnd
     if plots
         figTitle = parentFolder(5:end-1);   % Trim the simulation number and slash from the title
         title(subplotFig,{'Inter-Peak Minimum Velocity vs. Duration',figTitle},'FontSize',titleFontSize)
+%         title(subplotFig,'Rigid-Body Internal Model','FontSize',titleFontSize) % for SfN 2022 poster
         xlabel(subplotFig,'Movement Duration (s)','FontSize',labelFontSize);
-        ylabel(subplotFig,'Inter-Peak Minimum Velocity (m/s)','FontSize',labelFontSize);
+        ylabel(subplotFig,'Inter-Peak Minimum Velocity (m/s)','FontSize',labelFontSize);er
         
         if pairs && saveFiles
             saveas(gcf, strcat(saveFolder, "min vel vs duration correlation.png"))          

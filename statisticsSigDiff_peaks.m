@@ -1,16 +1,16 @@
 % Calculate statistical significance of difference between model mean
-% values using a t-test.
+% values.
 
 clear all
 close all
 clc
 
 %% Looking at mean of subject **median** VAFs
-C = readcell('data analysis/VAF summary 2022-11-21.xlsx');                  % all simulations
+C = readcell('data analysis/peak ratio results internal models.xlsx');      % simulations for SfN 2022 poster
 
 % Read all columns:
 x = C(1,2:end);                     % x-axis labels
-u = 100*cell2mat(C(2,2:end));       % means of median VAFs
+u = 100*cell2mat(C(2,2:end));       % means of median peak ratios
 s = 100*cell2mat(C(3,2:end));       % standard deviations
 
 % % Original input shaping
@@ -35,38 +35,33 @@ s = 100*cell2mat(C(3,2:end));       % standard deviations
 % n4 = 11;
 n = length(u); % same number of subjects for all simulations
 
-% % Compare original IS and multi-mode IS with feedforward
-% disp('Original IS versus multi-mode IS w/ feedforward')
-% sigdiff(u(1),u(2),s(1),s(2),n,n)
+% Compare experimental mean of medians to 1
+[h5,p5,ci,stats] = ttest(cell2mat(medianBySubject(2:12,simNum+1)),1,...
+        'Tail',tail)
+disp('Original IS versus multi-mode IS w/ feedforward')
+sigdiff(u(1),u(7),s(1),s(7),n,n)
 
-% % Compare original IS versus each simplified internal model IS with
-% % feedforward
-% disp('Original IS versus slow-mode internal model w/ feedforward')
-% sigdiff(u(1),u(3),s(1),s(3),n,n)
-% 
-% disp('Original IS versus fast-mode internal model w/ feedforward')
-% sigdiff(u(1),u(4),s(1),s(4),n,n)
-% 
-% disp('Original IS versus no-impedance internal model w/ feedforward')
-% sigdiff(u(1),u(5),s(1),s(5),n,n)
-% 
-% disp('Original IS versus rigid-body internal model w/ feedforward')
-% sigdiff(u(1),u(6),s(1),s(6),n,n)
+% Compare original IS versus each simplified internal model IS with
+% feedforward
+disp('Original IS versus slow-mode internal model w/ feedforward')
+sigdiff(u(1),u(8),s(1),s(8),n,n)
+
+disp('Original IS versus fast-mode internal model w/ feedforward')
+sigdiff(u(1),u(9),s(1),s(9),n,n)
+
+disp('Original IS versus no-impedance internal model w/ feedforward')
+sigdiff(u(1),u(10),s(1),s(10),n,n)
+
+disp('Original IS versus rigid-body internal model w/ feedforward')
+sigdiff(u(1),u(11),s(1),s(11),n,n)
 
 % Analyze significance between all simulation combinations and show in a
 % table
-% sigArray = strings(n,n);
-% for i = 1:n
-%     for j = 1:n
-%         sigArray(i,j) = sigdiff(u(i),u(j),s(i),s(j),n,n);
-%     end
-% end
+sigArray = strings(n,n);
 
-% Conduct one-tailed t-test to see if mean of median VAF in new simulation
-% is greater than mean of median VAF in original input shaping
-df = zeros(1,11);
-for i = 2:11
-    df(i) = ((s(1)^2/n + s(i)^2/n)^2)/(((s(1)^2/n)^2)/(n-1) + ((s(i)^2/n)^2)/(n-1));
+for i = 1:n
+        sigArray(i) = sigdiff(u(i),u(j),s(i),s(j),n,n);
+    end
 end
 
 %% Looking at mean of subject **median** VAFs
@@ -535,13 +530,7 @@ function significance = sigdiff(x1,x2,s1,s2,n1,n2)
     C2p = 2.326;
     C5p = 1.96;
 
-    % Critical values (one-tailed, dof = 10)
-    C1p = 2.764;
-    C25p = 2.228;
-    C5p = 1.812;
-
-    Z = abs((x1 - x2)/sqrt((s1^2)/n1 + (s2^2)/n2)); % two-tailed
-    Z = (x1-x2)/sqrt((s1^2)/n1 + (s2^2)/n2); % one-tailed
+    Z = abs((x1 - x2)/sqrt((s1^2)/n1 + (s2^2)/n2));
     if Z > C1p
 %         disp('1% Significant Difference')
         significance = '**';

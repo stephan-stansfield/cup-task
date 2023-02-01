@@ -1,4 +1,4 @@
-% minVelPlot
+% figVelocityDurationCorrelation (previously minVelPlot)
 %
 % Takes a block of kinematic trajectories and plots the values of the
 % inter-peak velocity "dip" against the duration of the trajectory.
@@ -13,26 +13,15 @@ clc;
 addpath('data', 'trim times', genpath('experimental data'));
 
 % Choose whether to plot simulated (true) or experimental (false) results
-plots = false; % whether to plot figures at all
+plots = true; % whether to plot figures at all
 plotSim = true;
 
-% Label for data type (experimental or type of simulation)
-dataLabels = {'IS', 'MM-FF', 'NI-FF', 'RB-FF', 'SM-FF', 'FM-FF', 'MM-NF',...
-    'NI-NF', 'RB-NF', 'SM-NF', 'FM-NF'};
-%     'SB', 'SB-FF', 'SB-NF', 'RB-FF-FI', ...
-%     'RB-FF-NI-10K', 'RB-FF-K-10K', 'RB-FF-B6.10-K75.125-10K', 'Test', ...
-%     'RB-FF-B6.10-K75.125-10K_corr', 'RB-FF-B6.10-K75.175', 'delay250-625',...
-%     'FBO', 'dur_corr','RB-FF-B6.20-K0.250-10K', 'RB-FF-B7.20-K0.250-10K',...
-%     '26. IS delay500', '27. MM delay500','28. RB-FF-B7.20-K0.250-10K-delay250',...
-%     '29. RB-FF-B0.50-K0.750-10K-delay500', 'Exp'};
+% Choose whether to save data & figures (Note: "pairs" must also be true)
+saveFiles = true;
 
-% Create tables to hold r and p values for each subject within a dataset
-rBySubject = {'Data Type'; 'S1'; 'S2'; 'S3'; 'S4'; 'S5'; 'S6';...
-    'S7'; 'S8'; 'S9'; 'S10'; 'S11'};
-pBySubject = {'Data Type'; 'S1'; 'S2'; 'S3'; 'S4'; 'S5'; 'S6';...
-    'S7'; 'S8'; 'S9'; 'S10'; 'S11'};
-
-overallResults = zeros(2,11,11);
+% Choose whether to plot by both blocks for each subject (true) or by
+% each block individually (false)
+pairs = true;
 
 % Choose range of simulation types to analyze
 simStart = 1;
@@ -42,12 +31,17 @@ simEnd = 11;
 numStart    = 1;
 numEnd      = 50;
 
-% Choose whether to save figures (Note: "pairs" must also be true)
-saveFiles = true;
+% Label for data type (experimental or type of simulation)
+dataLabels = {'IS', 'MM-NF', 'SM-NF', 'FM-NF', 'RB-NF', 'NI-NF', ...
+    'MM-FF', 'SM-FF', 'FM-FF', 'RB-FF', 'NI-FF'};
 
-% Choose whether to plot by both blocks for each subject (true) or by
-% each block individually (false)
-pairs = true;
+% Create tables to hold r and p values for each subject within a dataset
+rBySubject = {'Data Type'; 'S1'; 'S2'; 'S3'; 'S4'; 'S5'; 'S6';...
+    'S7'; 'S8'; 'S9'; 'S10'; 'S11'};
+pBySubject = {'Data Type'; 'S1'; 'S2'; 'S3'; 'S4'; 'S5'; 'S6';...
+    'S7'; 'S8'; 'S9'; 'S10'; 'S11'};
+
+overallResults = zeros(2,11,11);
 
 % Time step of simulated profile. NOTE that this has to match the step
 % used when simulating the profile. Usually this is 1 ms.
@@ -294,22 +288,33 @@ for simNum = simStart:simEnd
             plot(xfit,yfit,'LineWidth',2,'Color',plotColor)
             set(gca,'FontSize',axisFontSize)
             title(figTitle,'FontSize',subtitleFontSize);
-            xlim([minDuration, maxDuration]);
+%             th = title(figTitle,'FontSize',subtitleFontSize);
+%             titlePos = get(th, 'position')
+%             titlePos(2) = titlePos(2) - 1
+%             set(th, 'position', titlePos);
+%             xlim([minDuration, maxDuration]);
         end
         
     end
 
     if plots
         figTitle = parentFolder(5:end-1);   % Trim the simulation number and slash from the title
-        title(subplotFig,{'Inter-Peak Minimum Velocity vs. Duration',figTitle},'FontSize',titleFontSize)
+        title(subplotFig,figTitle,'FontSize',titleFontSize)
+%         title(subplotFig,{'Inter-Peak Minimum Velocity vs. Duration',figTitle},'FontSize',titleFontSize) % multi-line title
+%         title(subplotFig,'Rigid-Body Internal Model','FontSize',titleFontSize) % for SfN 2022 poster
         xlabel(subplotFig,'Movement Duration (s)','FontSize',labelFontSize);
         ylabel(subplotFig,'Inter-Peak Minimum Velocity (m/s)','FontSize',labelFontSize);
         
         if pairs && saveFiles
             saveas(gcf, strcat(saveFolder, "min vel vs duration correlation.png"))          
-            save(strcat(saveFolder, 'minVelData.mat'), 'durations', 'minVels')
         end
     end
+
+    if saveFiles
+        save(strcat(saveFolder, 'minVelData.mat'), 'durations', 'minVels',...
+            'rBySubject', 'pBySubject')
+    end
+
 
 end
 

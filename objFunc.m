@@ -83,7 +83,7 @@ function [val, gradient] = objFunc(x,optimizationType,ampMod,...
     % Add from 0 up to delayMax seconds to simulated time duration
     % TIME DELAY CHANGE
     tdessim = tdes + delayMin + 0.5*(tdelay-1)*(delayMax-delayMin);         % range from delayMin to delayMax
-%     tdessim = tdes + (tdelay-2)*delayMax;                                 % range from -delayMax to +delayMax
+%     tdessim = tdes + (tdelay-2)*delayMax;                                 % range from -delayMax to +delayMax (MARK FOR DELETION)
 
     % If system is not overdamped, simulate motion using given inputs
     if optimizationType == "input shaping 4 impulse"

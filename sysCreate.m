@@ -1,6 +1,9 @@
 function [sys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
         sysCreate(b,k,forwardF,ver,impedance,printSys)
 
+    % DEBUG
+%     disp("Inside sysCreate")
+
     G = globalData();
     m = G.m;
     M = G.M;
@@ -23,15 +26,15 @@ function [sys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
             % force
             B=[     0  ;                                                    % * U(t)
                     0  ;
-                   K/m ;
-                -K/(l*M) ];
+                   k/m ;
+                -k/(l*M) ];
 
             % 4 outputs: cart position, ball angle, cart vel, & ball
             % angular velocity. Ball angle converted from radians to deg.
-            C=[1     0      0    0     0;                                   % *[x theta x_dot theta_dot]'  
-               0 360/(2*pi) 0    0     0;
-               0     0      0    1     0;
-               0     0      0    0 360/(2*pi)];
+            C=[1     0      0     0 ;                                   % *[x theta x_dot theta_dot]'  
+               0 360/(2*pi) 0     0 ;
+               0     0      1     0 ;
+               0     0      0 360/(2*pi)];
 
             D=[0;
                0;
@@ -47,7 +50,7 @@ function [sys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
                         
            Brigid = [  0;                                                   % * U(t)
                        0;
-                     K/(m+M);
+                     k/(m+M);
                        0];
 
         % No feedforward force input term; forwardF = false
@@ -141,8 +144,8 @@ function [sys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
                         0];
         end
 
-        inputs={'u'};
-        outputs={'x' 'theta' 'x_{dot}' 'theta_{dot}' 'x_{des}'};
+        inputs={ 'u' };
+        outputs={ 'x', 'theta', 'x_{dot}', 'theta_{dot}' };
         sys=ss(A,B,C,D,'statename',states,'inputname',inputs,'outputname',outputs);
         sysRigid=ss(Arigid,Brigid,C,D,'statename',states,'inputname',inputs,'outputname',outputs);
 
@@ -211,23 +214,24 @@ function [sys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
         else
             % Assign natural frequency and damping ratio of two modes to variables
             [w,z] = damp(sys);
-            if forwardF
-                w1 = w(3);
-                w2 = w(5);
-                z1 = z(3);
-                z2 = z(5);
-            else
-                w1 = w(2);
-                w2 = w(4);
-                z1 = z(2);
-                z2 = z(4);
+%             if forwardF
+                w1 = w(1);
+                w2 = w(3);
+                z1 = z(1);
+                z2 = z(3);
+
+%             else
+%                 w1 = w(2);
+%                 w2 = w(4);
+%                 z1 = z(2);
+%                 z2 = z(4);
                 
-                % TESTING %
-                w1 = w(3);
-                w2 = w(5);
-                z1 = z(3);
-                z2 = z(5);
-            end
+%                 % TESTING %
+%                 w1 = w(3);
+%                 w2 = w(5);
+%                 z1 = z(3);
+%                 z2 = z(5);
+%             end
 
             % Input shaper using LOWER frequency
             zeta1 = z1;

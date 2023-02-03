@@ -47,16 +47,16 @@ plotPeaks = false;
 % entire block
 fitEachTrial = true;
 
-% Choose optimizaiton type
-optimizationType = "input shaping 2 impulse impedance";
+% Choose optimization type
+% optimizationType = "input shaping 2 impulse impedance";
 %     optimizationType = "input shaping 2 impulse no impedance";
-%     optimizationType = "input shaping 4 impulse";
+    optimizationType = "input shaping 4 impulse";
 %     optimizationType = "submovement";
 
 % Designate type of input shaping simplification, if any. This only
 % applies to 2-impulse input shaping.
-%     ver = "";
-ver        = "rigid body";
+    ver = "";
+%     ver        = "rigid body";
 %     ver        = "no impedance";
 %     ver        = "slow";
 %     ver        = "fast";
@@ -93,7 +93,7 @@ fitMethod = "eachTrial";
 
 % If running multiple iterations in a row, can use counter and if
 % statements to designate desired parameters.
-for setting = 10:10
+for setting = 0
     
     if setting == 1
         % 1. Original input shaping

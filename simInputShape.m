@@ -6,10 +6,19 @@
 % underdamped (0 < zeta < 1), the impulses will be asymmetrical. If the
 % system is critically or overdamped (zeta >= 1), input shaping will not work.
 
-function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,sys,...
+function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,sys,...
         sysRigid,Td1,Td2,zeta1,zeta2,tExp,tDesSim,xEnd,vStart,vEnd,fa11,...
         fa12,fa21,fa22,p,q,r,s,st,shift,forwardF,simVersion,modes,...
         pendIndex,fitMethod)
+
+    G = globalData();
+    m = G.m;
+    M = G.M;
+    l = G.l;
+    g = G.g;
+
+    % DEBUG
+%     disp("Inside simInputShape")
     
     % Reset flag for invalid trials
     flag = false;
@@ -41,8 +50,8 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,sys,.
             t2      = Td1/2;
             t2      = round(t2,mydigits(st));                                 % Round t2 to nearest time step
             tf      = tDesSim-t2;                                           % Duration of pre-convolved profile
-            t       = 0:st:tf;                                                      
-            tc      = 0:st:tDesSim;                                         % Time vector for convolved profile
+            t       = 0:st:tf;                                              % Time vector: pre-convolution
+            tc      = 0:st:tDesSim;                                         % Time vector: post-convolution
             lentc   = length(tc);
 
             if tf <= 0
@@ -69,57 +78,6 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,sys,.
             pulses(int16(1+t2/st))  = A2;                                   % Impulse 2 at t2
             pulsetimes              = find(pulses);                         % Find indices of all pulses
 
-            % Impulse timing shifts:
-            % Offset and shift p and q values so they each range from max
-            % to min delay in terms of number of array elements. Wrap in
-            % int16 to make sure indices are integer values.
-            p = int16((p-2)*shift/st);
-            q = int16((q-2)*shift/st); 
-
-            % Keep original value if iteration is unshifted.
-            % If p is positive, shift 1st pulse forward by shift time
-            if p > 0
-                % Identify index of shifted impulse.
-                pulseindex = pulsetimes(1) + p;
-
-                % Set amplitude at shifted pulse to value of original impulse
-                pulses(pulseindex) = pulses(pulsetimes(1));
-
-                % Set amplitude at original impulse time to zero
-                pulses(pulsetimes(1)) = 0;
-
-            % If p is negative, keep original value of 1st pulse and shift other 
-            % pulse forward. 
-            elseif p < 0
-
-                % Impulse #2
-                pulseindex              = pulsetimes(2) - p;
-                pulses(pulseindex)      = pulses(pulsetimes(2));
-                pulses(pulsetimes(2))   = 0;
-
-                % Find indicies of all pulses again so that these become the
-                % new indices for further shifts
-                pulsetimes = find(pulses);
-
-            end
-
-            % Keep original value if iteration is unshifted.
-            % Otherwise, shift forward or backward by shift time
-            if q ~= 0
-                % Identify index of shifted impulse. If shifted time is before
-                % movementonset, set to t=0.
-                pulseindex = pulsetimes(2) + q;
-                if pulseindex <= 0
-                    pulseindex = 1;
-                end
-
-                % Set amplitude at shifted pulse to value of original impulse
-                pulses(pulseindex) = pulses(pulsetimes(2));
-
-                % Set amplitude at original impulse time to zero
-                pulses(pulsetimes(2)) = 0;
-            end
-
         % 2 modes (4 input shaping impulses)
         else
             % Generate impulse times
@@ -131,6 +89,14 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,sys,.
             t       = 0:st:tf;
             tc      = 0:st:tDesSim;                                                % Time vector for convolved profile
             lentc   = length(tc);
+
+%             % DEBUG
+%             tDesSim
+%             toffset
+%             t21
+%             t22
+%             lent = length(t)
+%             lentc
 
             if tf <= 0
                 startIndex = 0;
@@ -144,14 +110,12 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,sys,.
                 return
             end
 
-            % Generate first mode impulse amplitudes. fa11 and fa12 are
-            % multiplicative factors to reproduce human subject execution error.
+            % Generate first mode impulse amplitudes
             K1      = exp(-zeta1*pi/sqrt(1-zeta1^2));     
             A11     = fa11*1/(1+K1);                                            % Amplitude of first impulse
             A21     = fa12*K1/(1+K1);                                           % Amplitude of second impulse
 
-            % Generate second mode impulse amplitudes. fa21 and fa22 are
-            % multiplicative factors to reproduce human subject execution error.
+            % Generate second mode impulse amplitudes
             K2      = exp(-zeta2*pi/sqrt(1-zeta2^2));     
             A12     = fa21*1/(1+K2);                        
             A22     = fa22*K2/(1+K2);             
@@ -172,121 +136,21 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,sys,.
             pulses  = conv(imp1,imp2);
 
             % Find indicies of all pulses
-            pulsetimes = find(pulses); 
+            pulsetimes = find(pulses);
 
-            % Offset and shift p, q, r, s values so they each range from max to
-            % min delay in terms of number of array elements. Wrap in int16 to
-            % make sure indices are integer values.
-            p = int16((p-2)*shift/st);
-            q = int16((q-2)*shift/st);
-            r = int16((r-2)*shift/st);
-            s = int16((s-2)*shift/st);        
+            % Trim trailing zeros from vector of pulses
+            pulses = pulses(1:pulsetimes(end));
 
-            % Keep original value if iteration is unshifted.
-            % If p is positive, shift 1st pulse forward by shift time
-            if p > 0
-                % Identify index of shifted impulse.
-                pulseindex = pulsetimes(1) + p;
+%             % DEBUG
+%             pulsetimes
+%             length(pulses)
 
-                % Set amplitude at shifted pulse to value of original impulse
-                pulses(pulseindex) = pulses(pulsetimes(1));
+            if forwardF
+                % Create dynamic system of internal model
+                [internal_sys,~,~,~,~,~,~,~,~] = sysCreate(b,k,forwardF,ver,true,false);
 
-                % Set amplitude at original impulse time to zero
-                pulses(pulsetimes(1)) = 0;
-
-            % If p is negative, keep original value of 1st pulse and shift
-            % other 3 pulses forward. 
-            elseif p < 0
-
-                % Impulse #2
-                pulseindex = pulsetimes(2) - p;
-                pulses(pulseindex) = pulses(pulsetimes(2));
-                pulses(pulsetimes(2)) = 0;
-
-                % Impulse #3
-                pulseindex = pulsetimes(3) - p;
-                pulses(pulseindex) = pulses(pulsetimes(3));
-                pulses(pulsetimes(3)) = 0;
-
-                % Impulse #4
-                % In rare case where second impulse of both modes is timed
-                % exactly the same, convolved impulses will only result in 3
-                % pulses. If statement checks for this condition.
-                if length(pulsetimes) == 4
-                    pulseindex = pulsetimes(4) - p;
-                    pulses(pulseindex) = pulses(pulsetimes(4));
-                    pulses(pulsetimes(4)) = 0;
-                end
-
-                % Find indicies of all pulses again so that these become the
-                % new indices for further shifts
-                pulsetimes = find(pulses);
-
-            end
-
-            % Keep original value if iteration is unshifted. Otherwise, shift 
-            % forward or backward by shift time
-            if q ~= 0
-                % Identify index of shifted impulse. If shifted time is before
-                % movement onset, set to t=0.
-                pulseindex = pulsetimes(2) + q;
-                if pulseindex <= 0
-                    pulseindex = 1;
-                end
-
-                % Set amplitude at shifted pulse to value of original impulse
-                pulses(pulseindex) = pulses(pulsetimes(2));
-
-                % Set amplitude at original impulse time to zero
-                pulses(pulsetimes(2)) = 0;
-            end
-
-            % Keep original value if iteration is unshifted. Otherwise, shift
-            % forward or backward by shift time.
-            if r ~= 0
-                % Check length of pulsetimes
-                if length(pulsetimes) == 3
-                    ind = 2;
-                else
-                    ind = 3;
-                end
-
-                % Identify index of shifted impulse. If shifted time is longer
-                % than movement duration, set to movement duration.
-                pulseindex = pulsetimes(ind) + r;
-                if pulseindex > lentc
-                    pulseindex = lentc;
-                end
-
-                % Set amplitude at shifted pulse to value of original impulse
-                pulses(pulseindex) = pulses(pulsetimes(ind));
-
-                % Set amplitude at original impulse time to zero
-                pulses(pulsetimes(ind)) = 0;
-            end
-
-            % Keep original value if iteration is unshifted. Otherwise, shift
-            % forward or backward by shift time.
-            if s ~= 0
-                % Check length of pulsetimes
-                if length(pulsetimes) == 3
-                    ind = 3;
-                else
-                    ind = 4;
-                end
-
-                % Identify index of shifted impulse. If shifted time is longer
-                % than movement duration, set to movement duration.
-                pulseindex = pulsetimes(ind) + s;
-                if pulseindex > lentc
-                    pulseindex = lentc;
-                end
-
-                % Set amplitude at shifted pulse to value of original impulse
-                pulses(pulseindex) = pulses(pulsetimes(ind));
-
-                % Set amplitude at original impulse time to zero
-                pulses(pulsetimes(ind)) = 0;
+                % DEBUG
+%                 disp("Back to simInputShape")
             end
 
         end
@@ -295,11 +159,30 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,sys,.
         % (ii): Shape desired input
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-        % Minimum-jerk velocity profile
-        v = xEnd*(30*(t/tf).^2 - 60*(t/tf).^3 + 30*(t/tf).^4)/tf;
+        % DEBUG
+%         disp("Before convolution")
+%         tf
+%         disp(["Length of t: ", num2str(length(t))])
 
-        % Convolve min jerk velocity profile with input shaping impulses
-        vc = conv(v,pulses);
+        % Minimum-jerk profiles
+        x = xEnd * (10 * (t / tf).^3 - 15 * (t / tf).^4 + 6 * (t / tf).^5);
+        v = xEnd * (30 * (t / tf).^2 - 60 * (t / tf).^3 + 30 * (t / tf).^4) / tf;
+        a = xEnd * (60 * (t / tf) - 180 * (t / tf).^2 + 120 * (t / tf).^3) / tf ^ 2;
+
+%         % DEBUG
+%         disp("Size of x & v: ")
+%         size(x)
+%         size(v)
+
+        % Convolve min jerk profiles with input shaping impulses
+        xc = conv(x, pulses);
+        vc = conv(v, pulses);
+        ac = conv(a, pulses);
+
+%         % DEBUG
+%         disp("After convolution. Size of xc & vc:")
+%         disp(size(xc))
+%         disp(size(vc))
         
         % Populate array to hold individual velocity submovement data
         vcOut = zeros(length(pulsetimes), length(vc));
@@ -318,54 +201,96 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,sys,.
             sub1End = st*find(vcOut(1,:), 1, 'last');
             sub2Start = st*find(vcOut(3,:), 1, 'first');
         else
-            lenPulses = length(pulsetimes)
+            lenPulses = length(pulsetimes);
             sub1End = 99;
             sub2Start = 99;
             disp('sub1End & sub2Start not assigned!')
             disp(' ')
         end
             
-            
-        % Make time and velocity arrays same length
+        % Make time and kinematics arrays same length, if rounding error
         if length(vc) > lentc
-            vc = vc(1:lentc);                                               % Trim vector after desired time
+            % Trim vectors after desired time
+            xc = xc(1:lentc);
+            vc = vc(1:lentc);
+            ac = ac(1:lentc);
         else
-            vc(lentc) = 0;                                                  % Pad end of array with zeros
+            % Pad end of array with zeros
+            xc(lentc) = 0;
+            vc(lentc) = 0;
+            ac(lentc) = 0;
         end
         lenvc = length(vc);
 
-        % Take approximative derivative of convolved velocity profile to
-        % get input acceleration profile. Take central difference at all
-        % interior points, forward difference at first point, and backward
-        % difference at last point.
-        ac         = zeros(1,lenvc);                                        % Initialize acceleration vector
-        ac(1)      = (vc(2) - vc(1))/st;                                    % Forward difference
-        ac(end)    = (vc(end) - vc(end-1))/st;                              % Backward difference
-
-        for i = 2:1:length(ac)-1
-            ac(i)  = (vc(i+1) - vc(i-1))/(2*st);                            % Central difference
-        end
-
-        % Make time and acceleration arrays same length
-        if length(ac) > lentc
-            ac = ac(1:lentc);                                               % Trim vector after desired time
-        else
-            ac(lentc) = 0;                                                  % Pad end of array with zeros
-        end
-
-        % Use desired acceleration trajectory as input
-        u = ac;
+%         % Take approximative derivative of convolved velocity profile to
+%         % get input acceleration profile. Take central difference at all
+%         % interior points, forward difference at first point, and backward
+%         % difference at last point.
+%         ac         = zeros(1,lenvc);                                        % Initialize acceleration vector
+%         ac(1)      = (vc(2) - vc(1))/st;                                    % Forward difference
+%         ac(end)    = (vc(end) - vc(end-1))/st;                              % Backward difference
+% 
+%         for i = 2:1:length(ac)-1
+%             ac(i)  = (vc(i+1) - vc(i-1))/(2*st);                            % Central difference
+%         end
+% 
+%         % Make time and acceleration arrays same length
+%         if length(ac) > lentc
+%             ac = ac(1:lentc);                                               % Trim vector after desired time
+%         else
+%             ac(lentc) = 0;                                                  % Pad end of array with zeros
+%         end
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % (iii): Simulate system response
+        % (iii): Simulate feedforward system response
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        if modes == 2
+            % DEBUG
+%             disp('Simulating feedforward response!')
+%             disp("Size of xc: ")
+%             disp(size(xc))
+%             disp("Size of vc: ")
+%             disp(size(vc))
+
+            % Simulate response of internal model when given shaped input
+            u = b / k * vc + xc ;
+            int_mdl_output = lsim(internal_sys,u,tc);
+            theta_des = int_mdl_output(:, 2);
+            v_des = int_mdl_output(:, 3);
+
+            % DEBUG
+%             disp("size of theta_des:")
+%             size(theta_des)
+%             disp("size of v_des:")
+%             size(v_des)
+
+            % Differentiate desired velocity to get desired acceleration 
+            a_des = zeros(length(v_des), 1);                                % Initialize acceleration row vector
+            a_des(1) = (v_des(2) - v_des(1)) / st;                        % Forward difference
+            a_des(end) = (v_des(end) - v_des(end - 1)) / st;                % Backward difference
+            for i = 2:1:length(a_des) - 1
+                a_des(i) = (v_des(i+1) - v_des(i-1)) / (2 * st);            % Central difference
+            end
+    
+            % Calculate feedforward force
+            f = M * a_des - m * g * theta_des;
+    
+            % Calculate system control input including feedforward force
+            u = f' / k + b / k * vc + xc ;
+
+            % DEBUG
+%             disp("Input w/ feedforward force dims: ")
+%             size(u)
+        end
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % (iv): Simulate system response
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-        % Simulate system response using convolved acceleration profile as
-        % simulation input. Store results in output variable.
         if simVersion == "linear"
             % Simulate linearized system
             output  = lsim(sys,u,tc);
-
+ 
             % Assign outputs to variables
             pos_sim     = output(:,1);
             theta_sim   = output(:,2);
@@ -395,6 +320,13 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,sys,.
             u1 = u(1:pendIndex);
             t2 = tc(pendIndex+1:end)-tc(pendIndex+1);                       % Shift value so first t = 0
             u2 = u(pendIndex+1:end);
+
+            % DEBUG
+%             disp("sizes of t1, u1, t2, u2: ")
+%             size(t1)
+%             size(u1)
+%             size(t2)
+%             size(u2)
 
             % Simulate rigid-body system for first portion of movement
             output1  = lsim(sysRigid,u1,t1);

@@ -217,9 +217,12 @@ relative_stop = 0.00001;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % NLOPT FUNCTION
-function [xopt, fmin] = NLopt(tc, tdes,xEnd,vStart,vEnd,pendIndex,...
-        pos,vel,acc,theta,omega,alpha,num,algorithm,setMaxEval)
+function [xopt, fmin] = NLopt(tc, tdes, xEnd, vStart, vEnd, pendIndex,...
+        pos, vel, acc, theta, omega, alpha, num, algorithm, setMaxEval)
     
+    % DEBUG
+%     disp("inside NLopt")
+
     % Set optimization algorithm
     opt.algorithm = algorithm;
     
@@ -477,10 +480,18 @@ if fitMethod == "fitToAverage"
 % trial for each individual experimental trial.
 else
 
+    % Slice start and stop indices into separate columns; this to avoid
+    % making Expression1 a broadcast variable in the parfor loop
+    starts = Expression1(:,1);
+    stops = Expression1(:,2);
+
     % Loop through trials, fitting values for each one
     % Parallel version:
-    parfor num = numStart:numEnd
+    for num = numStart:numEnd
+%     parfor num = numStart:numEnd
         numStr = num2str(num);
+        % DEBUG
+%         disp(["Parfor num: ", numStr])
 
         % Construct file name and load file of one experimental trial
         fileStr = strcat(subjStr,trialDate,trialStr,numStr);
@@ -495,11 +506,12 @@ else
         alpha = structTrial.alpha;
         t = structTrial.t;
         
-
         % Load start and stop indices of corresponding trial. Note that trials
         % are indexed from 0, so add 1 to access correct row in array.
-        start   = Expression1(num+1,1);
-        stop    = Expression1(num+1,2);
+        start = starts(num+1);
+        stop = stops(num+1);
+%         start   = Expression1(num+1,1);
+%         stop    = Expression1(num+1,2);
 
         % Trim experimental data
         [pos,theta,vel,omega,acc,alpha,tdes,~] = ...
@@ -523,7 +535,7 @@ else
 
         % Store best-fit parameters and objective function value in array 
         % to be accessed outside parfor-loop
-        xopt_array(num+1,:) = {xopt, fmin}
+        xopt_array(num+1,:) = {xopt, fmin};
 
     end
 
@@ -533,6 +545,9 @@ end
 % Output results of optimization
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 for num = numStart:numEnd
+
+    % DEBUG
+%     disp("Outputting results")
 
     xopt = xopt_array{num+1,1};
     fmin = xopt_array{num+1,2};
@@ -654,7 +669,7 @@ for num = numStart:numEnd
     % Simulate system with optimized parameters
     if optimizationType == "input shaping 4 impulse"
         modes = 2;
-        [output,vc,sub1End,sub2Start,dur_corr] = simInputShape(optB,optK,sys,...
+        [output,vc,sub1End,sub2Start,dur_corr] = simInputShape(optB,optK,ver,sys,...
             sysRigid,Td1,Td2,zeta1,zeta2,tdes,tdessim,xEnd,vStart,vEnd,...
             optA11,optA12,optA21,optA22,optP,optQ,optR,optS,st,shift,...
             forwardF,simVersion,modes,pendIndex,fitMethod);
@@ -669,7 +684,7 @@ for num = numStart:numEnd
         fa22    = 0;
         r       = 0;
         s       = 0;
-        [output,vc,sub1End,sub2Start,dur_corr] = simInputShape(optB,optK,sys,...
+        [output,vc,sub1End,sub2Start,dur_corr] = simInputShape(optB,optK,ver,sys,...
             sysRigid,Td,Td2,zeta,zeta2,tdes,tdessim,xEnd,vStart,vEnd,...
             optA1,optA2,fa21,fa22,optP,optQ,r,s,st,shift,forwardF,...
             simVersion,modes,pendIndex,fitMethod);

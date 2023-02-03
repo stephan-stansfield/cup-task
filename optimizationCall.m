@@ -8,7 +8,7 @@ clear all
 addpath('data', genpath('experimental data'));
 
 % Max number of evaluations per trial optimization algorithm will compute
-setMaxEval  = 100;
+setMaxEval  = 10000;
 
 % Choose range of experimental trials to fit (trial numbers start at 0)
 numStart    = 0;

@@ -97,6 +97,12 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
 %             t22
 %             lent = length(t)
 %             lentc
+%             Td1
+%             Td2
+%             zeta1
+%             zeta2
+%             tDesSim
+%             xEnd
 
             if tf <= 0
                 startIndex = 0;
@@ -159,31 +165,17 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
         % (ii): Shape desired input
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-        % DEBUG
-%         disp("Before convolution")
-%         tf
-%         disp(["Length of t: ", num2str(length(t))])
-
         % Minimum-jerk profiles
-        x = xEnd * (10 * (t / tf).^3 - 15 * (t / tf).^4 + 6 * (t / tf).^5);
+%         x = xEnd * (10 * (t / tf).^3 - 15 * (t / tf).^4 + 6 * (t / tf).^5);
         v = xEnd * (30 * (t / tf).^2 - 60 * (t / tf).^3 + 30 * (t / tf).^4) / tf;
-        a = xEnd * (60 * (t / tf) - 180 * (t / tf).^2 + 120 * (t / tf).^3) / tf ^ 2;
-
-%         % DEBUG
-%         disp("Size of x & v: ")
-%         size(x)
-%         size(v)
+        a = xEnd * (60 * (t / tf) - 180 * (t / tf).^2 + 120 * (t / tf).^3) / (tf ^ 2);
 
         % Convolve min jerk profiles with input shaping impulses
-        xc = conv(x, pulses);
+%         xc = conv(x, pulses);
         vc = conv(v, pulses);
         ac = conv(a, pulses);
 
-%         % DEBUG
-%         disp("After convolution. Size of xc & vc:")
-%         disp(size(xc))
-%         disp(size(vc))
-        
+        % DELETE this later if not needed %%
         % Populate array to hold individual velocity submovement data
         vcOut = zeros(length(pulsetimes), length(vc));
         for pulseCount = 1:length(pulsetimes)
@@ -207,20 +199,28 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
             disp('sub1End & sub2Start not assigned!')
             disp(' ')
         end
-            
+        % END DELETE %%
+
         % Make time and kinematics arrays same length, if rounding error
         if length(vc) > lentc
             % Trim vectors after desired time
-            xc = xc(1:lentc);
             vc = vc(1:lentc);
             ac = ac(1:lentc);
         else
             % Pad end of array with zeros
-            xc(lentc) = 0;
             vc(lentc) = 0;
             ac(lentc) = 0;
         end
         lenvc = length(vc);
+
+%         % DEBUG
+%         disp("Length of tc: ")
+%         length(tc)
+%         disp("Length of vc: ")
+%         length(vc)
+
+        xc = cumtrapz(tc, vc);
+        xc(end) = xc(end - 1); % correct cumtrapz calculating 0 for last index
 
 %         % Take approximative derivative of convolved velocity profile to
 %         % get input acceleration profile. Take central difference at all
@@ -253,9 +253,42 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
 %             disp(size(vc))
 
             % Simulate response of internal model when given shaped input
-            u = b / k * vc + xc ;
-            int_mdl_output = lsim(internal_sys,u,tc);
-            theta_des = int_mdl_output(:, 2);
+            u = (b / k * vc) + xc ;
+            int_mdl_output = lsim(internal_sys, u, tc);
+
+            % DEBUG
+%             figure();
+%             plot(tc, u)
+%             title("Internal model input")
+% 
+%             figure();
+%             plot(tc, xc)
+%             title("Convolved position")
+% 
+%             figure();
+%             plot(tc, vc)
+%             title("Convolved velocity")
+% 
+%             figure();
+%             plot(tc, int_mdl_output(:,1))
+%             title("Internal simulated cart position")
+% 
+%             figure();
+%             plot(tc, int_mdl_output(:,2))
+%             title("Internal simulated ball angle")
+% 
+%             figure();
+%             plot(tc, int_mdl_output(:,3))
+%             title("Internal simulated cart velocity")
+% 
+%             figure();
+%             plot(tc, int_mdl_output(:,4))
+%             title("Internal simulated ball angular velocity")
+% 
+%             disp("Internal system: ")
+%             internal_sys
+
+            theta_des = deg2rad(int_mdl_output(:, 2));
             v_des = int_mdl_output(:, 3);
 
             % DEBUG
@@ -266,17 +299,20 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
 
             % Differentiate desired velocity to get desired acceleration 
             a_des = zeros(length(v_des), 1);                                % Initialize acceleration row vector
-            a_des(1) = (v_des(2) - v_des(1)) / st;                        % Forward difference
+            a_des(1) = (v_des(2) - v_des(1)) / st;                          % Forward difference
             a_des(end) = (v_des(end) - v_des(end - 1)) / st;                % Backward difference
-            for i = 2:1:length(a_des) - 1
-                a_des(i) = (v_des(i+1) - v_des(i-1)) / (2 * st);            % Central difference
+            for i = 2:1:(length(a_des) - 1)
+                a_des(i) = (v_des(i + 1) - v_des(i - 1)) / (2 * st);            % Central difference
             end
     
             % Calculate feedforward force
             f = M * a_des - m * g * theta_des;
+%             f = M * a_des;
+%             f = M * ac' - m * g * theta_des;
+%             f = M * ac';
     
             % Calculate system control input including feedforward force
-            u = f' / k + b / k * vc + xc ;
+            u = (1 / k * f') + (b / k * vc) + xc ;
 
             % DEBUG
 %             disp("Input w/ feedforward force dims: ")
@@ -289,13 +325,13 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
 
         if simVersion == "linear"
             % Simulate linearized system
-            output  = lsim(sys,u,tc);
+            output  = lsim(sys, u, tc);
  
             % Assign outputs to variables
-            pos_sim     = output(:,1);
-            theta_sim   = output(:,2);
-            vel_sim     = output(:,3);
-            omega_sim   = output(:,4);
+            pos_sim     = output(:, 1);
+            theta_sim   = output(:, 2);
+            vel_sim     = output(:, 3);
+            omega_sim   = output(:, 4);
 
         % Simulate system with pendlulum lock bug
         elseif simVersion == "pendLock"
@@ -329,40 +365,43 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
 %             size(u2)
 
             % Simulate rigid-body system for first portion of movement
-            output1  = lsim(sysRigid,u1,t1);
+            output1 = lsim(sysRigid, u1, t1);
 
             % Capture values at end of first section to use as initial
             % condition input to second section
             if forwardF
-                if length(output1(1,:)) ~= 4
-                    X0 = [output1(end,5), output1(end,1),...                % xdes, x,
-                        output1(end,2)*2*pi/360, vc(pendIndex), ...         % theta (rad), xdes_dot = vc,
-                        output1(end,3), output1(end,4)*2*pi/360];           % x_dot, theta_dot (rad/s)
-                else
-                    X0 = [output1(end,1);                                   % x
-                          output1(end,2)*2*pi/360;                          % theta (rad)
-                          output1(end,3);                                   % x_dot
-                          output1(end,4)*2*pi/360];                         % theta_dot (rad/s)
-                end
+%                 if length(output1(1, :)) ~= 4
+% 
+%                     X0 = [output1(end,5), output1(end,1),...                % xdes, x,
+%                         output1(end,2)*2*pi/360, vc(pendIndex), ...         % theta (rad), xdes_dot = vc,
+%                         output1(end,3), output1(end,4)*2*pi/360];           % x_dot, theta_dot (rad/s)
+%                 else
+                    X0 = output1(end, :);
+%                     X0 = [output1(end, 1);                                  % x
+%                           output1(end, 2);                                  % theta (rad)
+%                           output1(end, 3);                                  % x_dot
+%                           output1(end, 4)];                                 % theta_dot (rad/s)
+%                 end
             else
-                X0 = [output1(end,5), output1(end,1),...                    % xdes, x,
-                    output1(end,2)*2*pi/360, vc(pendIndex),...              % theta (rad), xdes_dot = vc,
-                    output1(end,3), output1(end,4)*2*pi/360];               % x_dot, theta_dot (rad/s)
+%                 X0 = [output1(end,5), output1(end,1),...                    % xdes, x,
+%                     output1(end,2)*2*pi/360, vc(pendIndex),...              % theta (rad), xdes_dot = vc,
+%                     output1(end,3), output1(end,4)*2*pi/360];               % x_dot, theta_dot (rad/s)
             end
 
             % When pendulum is released, simulate full system for the
             % remainder of the move duration. Use values at end of previous
             % simulation as initial conditions for this simulation
-            output2 = lsim(sys,u2,t2,X0);
+            output2 = lsim(sys, u2, t2, X0);
 
             % Concatenate outputs
-            output = [output1; output2];
+            output = [output1;
+                      output2];
 
             % Assign outputs to variables
-            pos_sim     = output(:,1);
-            theta_sim   = output(:,2);
-            vel_sim     = output(:,3);
-            omega_sim   = output(:,4);
+            pos_sim     = output(:, 1);
+            theta_sim   = output(:, 2);
+            vel_sim     = output(:, 3);
+            omega_sim   = output(:, 4);
 
         elseif simVersion == "nonlinear"
             % Simulate system of nonlinear equations
@@ -371,9 +410,9 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
 
             % Assign outputs to variables
             pos_sim     = output(:,2);
-            theta_sim   = 360/(2*pi)*output(:,3);
+            theta_sim   = output(:,3);
             vel_sim     = output(:,5);
-            omega_sim   = 360/(2*pi)*output(:,6);
+            omega_sim   = output(:,6);
         end
 
         % Take approximative derivative of cart velocity to get cart
@@ -411,7 +450,7 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
             acc_sim     = acc_sim(startIndex:end);
             alpha_sim   = alpha_sim(startIndex:end);
             vc          = vc(startIndex:end);
-            vcOut       = vcOut(:,startIndex:end);
+            vcOut       = vcOut(:, startIndex:end);
         else
             startIndex  = 0;
         end

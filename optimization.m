@@ -487,8 +487,8 @@ else
 
     % Loop through trials, fitting values for each one
     % Parallel version:
-    for num = numStart:numEnd
-%     parfor num = numStart:numEnd
+%     for num = numStart:numEnd
+    parfor num = numStart:numEnd
         numStr = num2str(num);
         % DEBUG
 %         disp(["Parfor num: ", numStr])
@@ -608,9 +608,9 @@ for num = numStart:numEnd
 
     % Construct file name and load file of one experimental trial
     numStr = num2str(num);
-    fileStr = strcat(subjStr,trialDate,trialStr,numStr);
+    fileStr = strcat(subjStr, trialDate, trialStr, numStr);
     
-    load(fileStr,'pos','theta','vel','omega','acc','alpha','t');
+    load(fileStr, 'pos', 'theta', 'vel', 'omega', 'acc', 'alpha', 't');
 %     structTrial = load(fileStr,'pos','theta','vel','omega','acc','alpha','t');
 %     pos = structTrial.pos;
 %     theta = structTrial.theta;
@@ -622,39 +622,40 @@ for num = numStart:numEnd
 
     % Load start and stop indices of corresponding trial. Note that trials
     % are indexed from 0, so add 1 to access correct row in array.
-    start   = Expression1(num+1,1);
-    stop    = Expression1(num+1,2);
+    start = Expression1(num+1, 1);
+    stop = Expression1(num+1, 2);
 
-    % Trim experimental data
-    [pos,theta,vel,omega,acc,alpha,tdes,~] = ...
-        trimData(pos,theta,vel,omega,acc,alpha,t,st,start,stop);
+    % Trim experimental data. trimData takes angles in radians and returns
+    % them in degrees.
+    [pos, theta, vel, omega, acc, alpha, tdes, ~] = ...
+        trimData(pos, theta, vel, omega, acc, alpha, t, st, start, stop);
 
     % Define cart final position, initial and final velocities, and
     % pendulum release time from experimental data
     xEnd = pos(end);
     vStart = vel(1);
     vEnd = vel(end);
-    pendIndex = find(vel > 0.1, 1); % The first time index when cart velocity surpasses 0.1 m/s
+    pendIndex = find(vel > 0.1, 1); % first time index when cart velocity exceeds 0.1 m/s
 
     % Extend time vector to maximum delayed size. All time vectors will
     % be the same length, so shorter trials will be padded.
     tDesMax = tdes + delayMax;
-    tc=0:st:tDesMax;
+    tc = 0:st:tDesMax;
 
     % Translate optimization time parameters to actual times in seconds
-    optTdelay   = 0.5*(optTcount-1)*delayMax; % Range from delayMin to delayMax
+    optTdelay = 0.5 * (optTcount - 1) * delayMax; % Range from delayMin to delayMax
 %     optTdelay   = (optTcount-2)*delayMax;     % Range from -delayMax to +delayMax (MARK FOR DELETION)
-    tdessim     = tdes + optTdelay;
+    tdessim = tdes + optTdelay;
     if optimizationType == "input shaping 4 impulse"
-        optShift    = shift*[optP-2,optQ-2,optR-2,optS-2];
+        optShift = shift * [optP - 2, optQ - 2, optR - 2, optS - 2];
     elseif optimizationType == "input shaping 2 impulse impedance" ||...
             optimizationType == "input shaping 2 impulse no impedance"
-        optShift    = shift*[optP-2,optQ-2];
+        optShift = shift * [optP - 2, optQ - 2];
     end
     
     % Create system using optimal hyperparameters
-    [sys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
-        sysCreate(optB,optK,forwardF,ver,impedance,printSys);
+    [sys, sysRigid, Td, Td1, Td2, zeta, zeta1, zeta2, overdamped] = ...
+        sysCreate(optB, optK, forwardF, ver, impedance, printSys);
 
     if printSys
         % Output damping ratios and damped natural periods
@@ -669,10 +670,11 @@ for num = numStart:numEnd
     % Simulate system with optimized parameters
     if optimizationType == "input shaping 4 impulse"
         modes = 2;
-        [output,vc,sub1End,sub2Start,dur_corr] = simInputShape(optB,optK,ver,sys,...
-            sysRigid,Td1,Td2,zeta1,zeta2,tdes,tdessim,xEnd,vStart,vEnd,...
-            optA11,optA12,optA21,optA22,optP,optQ,optR,optS,st,shift,...
-            forwardF,simVersion,modes,pendIndex,fitMethod);
+        [output, vc, sub1End, sub2Start, dur_corr] = simInputShape(optB, ...
+            optK, ver, sys, sysRigid, Td1, Td2, zeta1, zeta2, tdes, ...
+            tdessim, xEnd, vStart, vEnd, optA11, optA12, optA21, optA22, ...
+            optP, optQ, optR, optS, st, shift, forwardF, simVersion, ...
+            modes, pendIndex, fitMethod);
         
     elseif optimizationType == "input shaping 2 impulse impedance" || ...
             optimizationType == "input shaping 2 impulse no impedance"
@@ -717,12 +719,12 @@ for num = numStart:numEnd
     end
     
     % Rename outputs for ease of use
-    pos_sim     = output(:,1);
-    theta_sim   = output(:,2);
-    vel_sim     = output(:,3);
-    omega_sim   = output(:,4);
-    acc_sim     = output(:,5);
-    alpha_sim   = output(:,6);
+    pos_sim     = output(:, 1);
+    theta_sim   = rad2deg(output(:, 2));
+    vel_sim     = output(:, 3);
+    omega_sim   = rad2deg(output(:, 4));
+    acc_sim     = output(:, 5);
+    alpha_sim   = rad2deg(output(:, 6));
     
     % Handle any size difference due to rounding error
     lensim = length(vel_sim);

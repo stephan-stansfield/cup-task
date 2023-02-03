@@ -17,151 +17,146 @@ function [sys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
         % Controller includes feedforward force input term
         if forwardF
             
-            A=[    0           0           1    0 ;                         % *[x theta x_dot theta_dot]'   
-                   0           0           0    1 ;
-                -k/M         m*g/M       -b/M   0 ;
-               k/(l*M) -(g*(m+M))/(l*M) b/(l*M) 0 ];
+            A = [      0,                0,               1,      0 ;       % * [    x
+                       0,                0,               0,      1 ;       %      theta
+                    -k / M,          g * m / M,        -b / M,    0 ;       %      x_dot
+                 k / (l * M), - g / l * (m + M) / M, b / (l * M), 0 ];      %    theta_dot ]
 
             % Input U(t) includes feedforward force and half of impedance
             % force
-            B=[     0  ;                                                    % * U(t)
-                    0  ;
-                   k/m ;
-                -k/(l*M) ];
+            B = [      0 ;                                                  % * U(t)
+                       0 ;
+                     k / M ;
+                  -k / (l * M) ];
 
-            % 4 outputs: cart position, ball angle, cart vel, & ball
-            % angular velocity. Ball angle converted from radians to deg.
-            C=[1     0      0     0 ;                                   % *[x theta x_dot theta_dot]'  
-               0 360/(2*pi) 0     0 ;
-               0     0      1     0 ;
-               0     0      0 360/(2*pi)];
+            C = eye(4);
 
-            D=[0;
-               0;
-               0;
-               0];
+            D = zeros(4, 1);
 
-            states={'x' 'theta' 'x_{dot}' 'theta_{dot}'};
+            states = {'x', 'theta', 'x_{dot}', 'theta_{dot}'};
             
-            Arigid = [     0     0     1    0 ;                             % *[x theta x_dot theta_dot]'   
-                           0     0     0    1 ;
-                        -k/(m+M) 0 -b/(m+M) 0 ;
-                           0     0     0    0 ];
+            Arigid = [       0,       0,      1,       0 ;                  % * [    x 
+                             0,       0,      0,       1 ;                  %      theta
+                        -k / (m + M), 0, -b / (m + M), 0 ;                  %      x_dot    
+                             0,       0,      0,       0 ];                 %    theta_dot ]
                         
-           Brigid = [  0;                                                   % * U(t)
-                       0;
-                     k/(m+M);
-                       0];
+           Brigid = [    0 ;                                                % * U(t)
+                         0 ;
+                     k / (m + M);
+                         0 ];
 
         % No feedforward force input term; forwardF = false
         else
-            %{
-            A=[    0       0            0          0        0 ;             % *[x_des, x, theta, x_dot, theta_dot]'
-                   0       0            0          1        0 ;        
-                   0       0            0          0        1 ;
-                  k/M    -k/M         m*g/M      -b/M       0 ;
-               -k/(l*M) k/(l*M) -g*(m+M)/(l*M)  b/(l*M)     0 ];
-
-            % Input "u" is desired velocity
-            B=[   1    ;                                                    % *x_des_dot
-                  0    ;                 
-                  0    ;
-                 b/M   ;
-               -b/(l*M)];
-           
-           % Note: added 5th output, xdes, for pendulum lock code.
-           C=[ 0      1     0      0      0;                                % *[x_des, x, theta, x_dot, theta_dot]'
-               0      0 360/(2*pi) 0      0;
-               0      0      0     1      0;
-               0      0      0     0   360/(2*pi);
-               1      0      0     0      0];
-
-            D=[0;                                                           % *x_des_dot
-               0;
-               0;
-               0;
-               0];
-
-            states={'x_{des}' 'x' 'theta' 'x_{dot}' 'theta_{dot}'};
-            
-            Arigid = [     0       0     0    0      0;                     % *[x_des, x, theta, x_dot, theta_dot]'
-                           0       0     0    1      0;
-                           0       0     0    0      1;
-                        k/(m+M) -k/(m+M) 0 -b/(m+M)  0;
-                           0       0     0    0      0];
-                    
-           Brigid = [   1;                                                  % *x_des_dot
-                        0;
-                        0;
-                      b/(m+M);
-                        0];
-            %}
-
-            % TESTING %
-            % Try with x''des input instead. Does this change anything?
-            A=  [    0       0            0         1         0    0 ;      % *[x_des, x, theta, x_des_dot, x_dot, theta_dot]'
-                     0       0            0         0         1    0 ;
-                     0       0            0         0         0    1 ;
-                     0       0            0         0         0    0 ;
-                    k/M    -k/M         m*g/M      b/M      -b/M   0 ;
-                 -k/(l*M) k/(l*M) -g*(m+M)/(l*M) -b/(l*M)  b/(l*M) 0 ];
-
-            % Input "u" is desired ACCELERATION
-            B = [   0    ;                                                  % *x_des_dotdot
-                    0    ;                 
-                    0    ;
-                    1    ;
-                    0   ;
-                    0];
-           
-           % Note: added 5th output, xdes, for pendulum lock code.
-           C=[ 0      1     0      0    0      0;                           % *[x_des, x, theta, x_des_dot, x_dot, theta_dot]'
-               0      0 360/(2*pi) 0    0      0;
-               0      0      0     0    1      0;
-               0      0      0     0    0   360/(2*pi);
-               1      0      0     0    0      0];
-
-            D=[0;                                                           % *x_des_dotdot
-               0;
-               0;
-               0;
-               0];
-
-            states={'x_{des}' 'x' 'theta' 'x_{dot}_{des}' 'x_{dot}' 'theta_{dot}'};
-            
-            Arigid = [     0       0     0      1      0      0;                     % *[x_des, x, theta, x_des_dot, x_dot, theta_dot]'
-                           0       0     0      0      1      0;
-                           0       0     0      0      0      1;
-                           0       0     0      0      0      0;
-                        k/(m+M) -k/(m+M) 0  b/(m+M) -b/(m+M)  0;
-                           0       0     0      0      0      0];
-                    
-           Brigid = [   0;                                                  % *x_des_dotdot
-                        0;
-                        0;
-                        1;
-                        0;
-                        0];
+%             %{
+%             A=[    0       0            0          0        0 ;             % *[x_des, x, theta, x_dot, theta_dot]'
+%                    0       0            0          1        0 ;        
+%                    0       0            0          0        1 ;
+%                   k/M    -k/M         m*g/M      -b/M       0 ;
+%                -k/(l*M) k/(l*M) -g*(m+M)/(l*M)  b/(l*M)     0 ];
+% 
+%             % Input "u" is desired velocity
+%             B=[   1    ;                                                    % *x_des_dot
+%                   0    ;                 
+%                   0    ;
+%                  b/M   ;
+%                -b/(l*M)];
+%            
+%            % Note: added 5th output, xdes, for pendulum lock code.
+%            C=[ 0      1     0      0      0;                                % *[x_des, x, theta, x_dot, theta_dot]'
+%                0      0 360/(2*pi) 0      0;
+%                0      0      0     1      0;
+%                0      0      0     0   360/(2*pi);
+%                1      0      0     0      0];
+% 
+%             D=[0;                                                           % *x_des_dot
+%                0;
+%                0;
+%                0;
+%                0];
+% 
+%             states={'x_{des}' 'x' 'theta' 'x_{dot}' 'theta_{dot}'};
+%             
+%             Arigid = [     0       0     0    0      0;                     % *[x_des, x, theta, x_dot, theta_dot]'
+%                            0       0     0    1      0;
+%                            0       0     0    0      1;
+%                         k/(m+M) -k/(m+M) 0 -b/(m+M)  0;
+%                            0       0     0    0      0];
+%                     
+%            Brigid = [   1;                                                  % *x_des_dot
+%                         0;
+%                         0;
+%                       b/(m+M);
+%                         0];
+%             %}
+% 
+%             % TESTING %
+%             % Try with x''des input instead. Does this change anything?
+%             A=  [    0       0            0         1         0    0 ;      % *[x_des, x, theta, x_des_dot, x_dot, theta_dot]'
+%                      0       0            0         0         1    0 ;
+%                      0       0            0         0         0    1 ;
+%                      0       0            0         0         0    0 ;
+%                     k/M    -k/M         m*g/M      b/M      -b/M   0 ;
+%                  -k/(l*M) k/(l*M) -g*(m+M)/(l*M) -b/(l*M)  b/(l*M) 0 ];
+% 
+%             % Input "u" is desired ACCELERATION
+%             B = [   0    ;                                                  % *x_des_dotdot
+%                     0    ;                 
+%                     0    ;
+%                     1    ;
+%                     0   ;
+%                     0];
+%            
+%            % Note: added 5th output, xdes, for pendulum lock code.
+%            C=[ 0      1     0      0    0      0;                           % *[x_des, x, theta, x_des_dot, x_dot, theta_dot]'
+%                0      0 360/(2*pi) 0    0      0;
+%                0      0      0     0    1      0;
+%                0      0      0     0    0   360/(2*pi);
+%                1      0      0     0    0      0];
+% 
+%             D=[0;                                                           % *x_des_dotdot
+%                0;
+%                0;
+%                0;
+%                0];
+% 
+%             states={'x_{des}' 'x' 'theta' 'x_{dot}_{des}' 'x_{dot}' 'theta_{dot}'};
+%             
+%             Arigid = [     0       0     0      1      0      0;                     % *[x_des, x, theta, x_des_dot, x_dot, theta_dot]'
+%                            0       0     0      0      1      0;
+%                            0       0     0      0      0      1;
+%                            0       0     0      0      0      0;
+%                         k/(m+M) -k/(m+M) 0  b/(m+M) -b/(m+M)  0;
+%                            0       0     0      0      0      0];
+%                     
+%            Brigid = [   0;                                                  % *x_des_dotdot
+%                         0;
+%                         0;
+%                         1;
+%                         0;
+%                         0];
         end
 
-        inputs={ 'u' };
-        outputs={ 'x', 'theta', 'x_{dot}', 'theta_{dot}' };
-        sys=ss(A,B,C,D,'statename',states,'inputname',inputs,'outputname',outputs);
-        sysRigid=ss(Arigid,Brigid,C,D,'statename',states,'inputname',inputs,'outputname',outputs);
+        inputs = {'u'};
+        outputs = {'x', 'theta', 'x_{dot}', 'theta_{dot}'};
+        sys = ss(A, B, C, D, 'statename', states, 'inputname', inputs, ...
+            'outputname', outputs);
+        sysRigid = ss(Arigid, Brigid, C, D, 'statename', states, ...
+            'inputname', inputs, 'outputname', outputs);
 
         % Print out system transfer function, poles, and zeros
         if printSys
-            H = ss2tf(A,B,C,D)
+            H = ss2tf(A, B, C, D)
 
             disp(['"zeros" contains the system zeros in its columns. Number of ' ...
             'columns in zeros corresponds to number of outputs. "poles" is a ' ...
             'column vector containing the coefficients of the poles of the ' ...
             'poles of the system.']);
-            [zeros, poles, ~] = ss2zp(A,B,C,D)
+            [zs, poles, ~] = ss2zp(A, B, C, D)
             
             % Show pole-zero map
             figure();
             pzmap(sys)
+
         end
 
         % Input shaping based on simplified internal model
@@ -299,15 +294,9 @@ function [sys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
 
         % 4 outputs: cart position, ball angle, cart vel, & ball angular
         % velocity. Ball angle converted from radians to degrees.
-        C=[1     0      0     0;                                            % *[x theta x_dot theta_dot]'
-           0 360/(2*pi) 0     0;
-           0     0      1     0;
-           0     0      0 360/(2*pi)];
+        C = eye(4);
 
-        D=[0;                                                               % *x''_des'
-           0;
-           0;
-           0];
+        D = zeros(4, 1);
 
         states={'x' 'theta' 'x_{dot}' 'theta_{dot}'};
         
@@ -342,4 +331,5 @@ function [sys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
         zeta2 = 0;
         
     end
+
 end

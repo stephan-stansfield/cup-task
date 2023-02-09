@@ -8,16 +8,16 @@ clear all
 addpath('data', genpath('experimental data'));
 
 % Max number of evaluations per trial optimization algorithm will compute
-setMaxEval  = 10000;
+setMaxEval  = 100;
 
 % Choose range of experimental trials to fit (trial numbers start at 0)
 numStart    = 0;
-numEnd      = 49;
+numEnd      = 0;
 
 % Choose blocks to loop through. The 11 acceptable subjects 
 % correspond to blocks 1-22. All blocks would be 1 to 28.
 blockStart  = 1;
-blockEnd    = 2;
+blockEnd    = 1;
 
 % Set range of additional duration values to simulate trials before trimming
 delayMin = 0;       % [sec]
@@ -48,20 +48,19 @@ plotPeaks = false;
 fitEachTrial = true;
 
 % Choose optimization type
-% optimizationType = "input shaping 2 impulse impedance";
+optimizationType = "input shaping 2 impulse impedance";
 %     optimizationType = "input shaping 2 impulse no impedance";
-    optimizationType = "input shaping 4 impulse";
+%     optimizationType = "input shaping 4 impulse";
 %     optimizationType = "submovement";
 
-% Designate type of input shaping simplification, if any. This only
-% applies to 2-impulse input shaping.
-    ver = "";
-%     ver        = "rigid body";
-%     ver        = "no impedance";
-%     ver        = "slow";
-%     ver        = "fast";
+% Designate type of internal model used for input shaping and feedforward.
+%     ver = "full";
+%     ver = "rigid body";
+    ver = "no impedance";
+%     ver = "slow";
+%     ver = "fast";
 
-% Choose if simulatione  includes time and/or amplitude error
+% Choose if simulation includes time and/or amplitude error
 timeMod = false;
 ampMod  = false;
 

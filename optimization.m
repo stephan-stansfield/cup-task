@@ -43,7 +43,7 @@ function optimization(blockNum,optimizationType,modelStr,forwardF,timeMod,...
 % mass, and length are defined in globalData.m)
 Bmin        = 7.5;                                                            % Minimum damping value (N*s/m)
 Bmax        = 75;                                                           % Maximum damping value (N*s/m)
-Kmin        = 0;                                                            % Minimum  stiffness value (N/m)
+Kmin        = 7.5;                                                            % Minimum  stiffness value (N/m)
 Kmax        = 750;                                                          % Maximum stiffness value (N/m)
 st          = 0.001;                                                        % Simulation time step (s)
 tDesMax     = 0;                                                            % Initialize maximum time duration
@@ -487,8 +487,8 @@ else
 
     % Loop through trials, fitting values for each one
     % Parallel version:
-%     for num = numStart:numEnd
-    parfor num = numStart:numEnd
+    for num = numStart:numEnd
+%     parfor num = numStart:numEnd
         numStr = num2str(num);
         % DEBUG
 %         disp(["Parfor num: ", numStr])
@@ -655,7 +655,7 @@ for num = numStart:numEnd
     
     % Create system using optimal hyperparameters
     [sys, sysRigid, Td, Td1, Td2, zeta, zeta1, zeta2, overdamped] = ...
-        sysCreate(optB, optK, forwardF, ver, impedance, printSys);
+        sysCreate(optB, optK, forwardF, "full", impedance, printSys);
 
     if printSys
         % Output damping ratios and damped natural periods

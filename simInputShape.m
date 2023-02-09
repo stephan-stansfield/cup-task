@@ -26,9 +26,9 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
     % Run first-pass simulation
     [output, startIndex, vcOut, sub1End, sub2Start, dur_corr] = sim();
     
+    % If first run produces a rejection, take the output and return to
+    % the optimization function without running a second time
     if flag
-        % If first run produces a rejection, take the output and return to
-        % the optimization script without running a second time
         return
     end
              
@@ -46,17 +46,17 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
         % 1 mode (2 input shaping impulses)
         if modes == 1
             % Generate impulse times
-            t1      = 0;                                                            
-            t2      = Td1/2;
-            t2      = round(t2,mydigits(st));                                 % Round t2 to nearest time step
-            tf      = tDesSim-t2;                                           % Duration of pre-convolved profile
-            t       = 0:st:tf;                                              % Time vector: pre-convolution
-            tc      = 0:st:tDesSim;                                         % Time vector: post-convolution
-            lentc   = length(tc);
+            t1 = 0;                                                            
+            t2 = Td1 / 2;
+            t2 = round(t2, mydigits(st));                                   % Round t2 to nearest time step
+            tf = tDesSim - t2;                                              % Duration of pre-convolved profile
+            t  = 0:st:tf;                                                   % Time vector: pre-convolution
+            tc = 0:st:tDesSim;                                              % Time vector: post-convolution
+            lentc = length(tc);
 
             if tf <= 0
                 startIndex = 0;
-                output = 100000*ones(length(tc),6);
+                output = 100000*ones(length(tc), 6);
                 vc = [];
                 vcOut = [];
                 sub1End = 99;
@@ -66,47 +66,32 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
                 return
             end
 
-            % Generate impulse amplitudes. fa11 and fa12 are multiplicative
-            % factors to reproduce human subject execution error.
-            K       = exp(-zeta1*pi/sqrt(1-zeta1^2));     
-            A1      = fa11*1/(1+K);                                         % Amplitude of first impulse
-            A2      = fa12*K/(1+K);                                         % Amplitude of second impulse  
+            % Generate impulse amplitudes
+            K = exp(-zeta1 * pi / sqrt(1 - zeta1 ^ 2));     
+            A1 = 1 / (1 + K);
+            A2 = K / (1 + K);
             
-            % Create vector for impulses
-            pulses                  = zeros(1,length(t));                   % Initialize vector for impulses
-            pulses(int16(1+t1/st))  = A1;                                   % Impulse 1 at t1
-            pulses(int16(1+t2/st))  = A2;                                   % Impulse 2 at t2
-            pulsetimes              = find(pulses);                         % Find indices of all pulses
-
-        % 2 modes (4 input shaping impulses)
-        else
+            % Create vector of impulses
+            pulses = zeros(1, length(t));                           
+            pulses(int16(1 + t1 / st)) = A1;                                % Impulse 1 at t1
+            pulses(int16(1 + t2 / st)) = A2;                                % Impulse 2 at t2
+            pulsetimes = find(pulses);                                      % Get indices of pulses
+            pulses = pulses(1:pulsetimes(end));                             % Trim trailing zeros from vector of pulses
+        
+        else % 2 modes (4 input shaping impulses)
             % Generate impulse times
-            t1      = 0;                                                        % Set t1 to t=0 for both modes
-            t21     = Td1/2;                                                    % Second impulse for first mode
-            t22     = Td2/2;                                                    % Second impulse for second mode
-            toffset = t21+t22;
-            tf      = tDesSim-toffset;                                             % Duration of pre-convolved profile
-            t       = 0:st:tf;
-            tc      = 0:st:tDesSim;                                                % Time vector for convolved profile
-            lentc   = length(tc);
-
-%             % DEBUG
-%             tDesSim
-%             toffset
-%             t21
-%             t22
-%             lent = length(t)
-%             lentc
-%             Td1
-%             Td2
-%             zeta1
-%             zeta2
-%             tDesSim
-%             xEnd
+            t1 = 0;                                                         % Set t1 to t=0 for both modes
+            t21 = Td1 / 2;                                                  % Second impulse for first mode
+            t22 = Td2 / 2;                                                  % Second impulse for second mode
+            toffset = t21 + t22;
+            tf = tDesSim - toffset;                                         % Duration of pre-convolved profile
+            t = 0:st:tf;                                                    % Time vector: pre-convolution
+            tc = 0:st:tDesSim;                                              % Time vector: post-convolution
+            lentc = length(tc);
 
             if tf <= 0
                 startIndex = 0;
-                output = 100000*ones(length(tc),6);
+                output = 100000*ones(length(tc), 6);
                 vc = [];
                 vcOut = [];
                 sub1End = 99;
@@ -117,61 +102,42 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
             end
 
             % Generate first mode impulse amplitudes
-            K1      = exp(-zeta1*pi/sqrt(1-zeta1^2));     
-            A11     = fa11*1/(1+K1);                                            % Amplitude of first impulse
-            A21     = fa12*K1/(1+K1);                                           % Amplitude of second impulse
+            K1 = exp(-zeta1 * pi / sqrt(1 - zeta1 ^ 2));     
+            A11 = 1 / (1 + K1);
+            A21 = K1 / (1 + K1);
 
             % Generate second mode impulse amplitudes
-            K2      = exp(-zeta2*pi/sqrt(1-zeta2^2));     
-            A12     = fa21*1/(1+K2);                        
-            A22     = fa22*K2/(1+K2);             
+            K2 = exp(-zeta2 * pi / sqrt(1 - zeta2 ^ 2));     
+            A12 = 1 / (1 + K2);                        
+            A22 = K2 / (1 + K2);             
 
-            % Create vector for first mode impulses
-            t21     = round(t21,mydigits(st));                                    % Round t21 to nearest time step
-            imp1    = zeros(1,length(t));                                       % Initialize imp vector for input impulses
-            imp1(int16(1+t1/st))    = A11;                                      % Impulse 1 at t1
-            imp1(int16(1+t21/st))   = A21;                                      % Impulse 2 at t21
+            % Create vector of first mode impulses
+            t21 = round(t21, mydigits(st));                                 % Round t21 to nearest time step
+            imp1 = zeros(1, length(t));                                     % Initialize imp vector for input impulses
+            imp1(int16(1 + t1 / st)) = A11;                                 % Impulse 1 at t1
+            imp1(int16(1 + t21 / st)) = A21;                                % Impulse 2 at t21
 
-            % Create vector for second mode impulses
-            t22     = round(t22,mydigits(st));                                    % Round t22 to nearest time step
-            imp2    = zeros(1,length(t));                                       % Initialize imp vector for input impulses
-            imp2(int16(1+t1/st))    = A12;                                      % Impulse 1 at t1
-            imp2(int16(1+t22/st))   = A22;                                      % Impulse 2 at t22
+            % Create vector of second mode impulses
+            t22 = round(t22, mydigits(st));                                 % Round t22 to nearest time step
+            imp2 = zeros(1, length(t));                                     % Initialize imp vector for input impulses
+            imp2(int16(1 + t1 / st)) = A12;                                 % Impulse 1 at t1
+            imp2(int16(1 + t22 / st)) = A22;                                % Impulse 2 at t22
 
-            % Convolve two sets of impulses
-            pulses  = conv(imp1,imp2);
-
-            % Find indicies of all pulses
-            pulsetimes = find(pulses);
-
-            % Trim trailing zeros from vector of pulses
-            pulses = pulses(1:pulsetimes(end));
-
-%             % DEBUG
-%             pulsetimes
-%             length(pulses)
-
-            if forwardF
-                % Create dynamic system of internal model
-                [internal_sys,~,~,~,~,~,~,~,~] = sysCreate(b,k,forwardF,ver,true,false);
-
-                % DEBUG
-%                 disp("Back to simInputShape")
-            end
+            pulses = conv(imp1, imp2);                                      % Convolve two sets of impulses
+            pulsetimes = find(pulses);                                      % Find indicies of pulses
+            pulses = pulses(1:pulsetimes(end));                             % Trim trailing zeros from vector of pulses
 
         end
 
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % (ii): Shape desired input
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
         % Minimum-jerk profiles
-%         x = xEnd * (10 * (t / tf).^3 - 15 * (t / tf).^4 + 6 * (t / tf).^5);
         v = xEnd * (30 * (t / tf).^2 - 60 * (t / tf).^3 + 30 * (t / tf).^4) / tf;
         a = xEnd * (60 * (t / tf) - 180 * (t / tf).^2 + 120 * (t / tf).^3) / (tf ^ 2);
 
         % Convolve min jerk profiles with input shaping impulses
-%         xc = conv(x, pulses);
         vc = conv(v, pulses);
         ac = conv(a, pulses);
 
@@ -201,26 +167,24 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
         end
         % END DELETE %%
 
-        % Make time and kinematics arrays same length, if rounding error
-        if length(vc) > lentc
-            % Trim vectors after desired time
+        % Make time and kinematics arrays same length if rounding error
+        if length(vc) > lentc % Trim vectors after desired time  
             vc = vc(1:lentc);
             ac = ac(1:lentc);
-        else
-            % Pad end of array with zeros
+        else % Pad end of array with zeros
             vc(lentc) = 0;
             ac(lentc) = 0;
         end
         lenvc = length(vc);
+
+        xc = cumtrapz(tc, vc);
+        xc(end) = xc(end - 1); % correct cumtrapz calculating 0 for last index
 
 %         % DEBUG
 %         disp("Length of tc: ")
 %         length(tc)
 %         disp("Length of vc: ")
 %         length(vc)
-
-        xc = cumtrapz(tc, vc);
-        xc(end) = xc(end - 1); % correct cumtrapz calculating 0 for last index
 
 %         % Take approximative derivative of convolved velocity profile to
 %         % get input acceleration profile. Take central difference at all
@@ -241,87 +205,118 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
 %             ac(lentc) = 0;                                                  % Pad end of array with zeros
 %         end
 
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % (iii): Simulate feedforward system response
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        if modes == 2
-            % DEBUG
-%             disp('Simulating feedforward response!')
-%             disp("Size of xc: ")
-%             disp(size(xc))
-%             disp("Size of vc: ")
-%             disp(size(vc))
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % (iii): Generate control input
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        if forwardF
+
+            % If using feedforward force, simulate the response of the
+            % internal model and use this as the "desired" trajectory in
+            % the inverse dynamics
+
+            % Create dynamic system of internal model
+            [internal_sys,~,~,~,~,~,~,~,~] = sysCreate(b, k, forwardF, ver, true, false);
+
+            % Choose shaped input by internal model
+            if ver == "rigid body"
+                u = (b / k * vc) + xc ;
+
+            elseif ver == "no impedance"
+                u = ac;
+            end
 
             % Simulate response of internal model when given shaped input
-            u = (b / k * vc) + xc ;
             int_mdl_output = lsim(internal_sys, u, tc);
 
-            % DEBUG
-%             figure();
-%             plot(tc, u)
-%             title("Internal model input")
-% 
-%             figure();
-%             plot(tc, xc)
-%             title("Convolved position")
-% 
-%             figure();
-%             plot(tc, vc)
-%             title("Convolved velocity")
-% 
-%             figure();
-%             plot(tc, int_mdl_output(:,1))
-%             title("Internal simulated cart position")
-% 
-%             figure();
-%             plot(tc, int_mdl_output(:,2))
-%             title("Internal simulated ball angle")
-% 
-%             figure();
-%             plot(tc, int_mdl_output(:,3))
-%             title("Internal simulated cart velocity")
-% 
-%             figure();
-%             plot(tc, int_mdl_output(:,4))
-%             title("Internal simulated ball angular velocity")
-% 
-%             disp("Internal system: ")
-%             internal_sys
-
-            theta_des = deg2rad(int_mdl_output(:, 2));
+            % Get desired velocity profile
             v_des = int_mdl_output(:, 3);
-
-            % DEBUG
-%             disp("size of theta_des:")
-%             size(theta_des)
-%             disp("size of v_des:")
-%             size(v_des)
 
             % Differentiate desired velocity to get desired acceleration 
             a_des = zeros(length(v_des), 1);                                % Initialize acceleration row vector
             a_des(1) = (v_des(2) - v_des(1)) / st;                          % Forward difference
             a_des(end) = (v_des(end) - v_des(end - 1)) / st;                % Backward difference
             for i = 2:1:(length(a_des) - 1)
-                a_des(i) = (v_des(i + 1) - v_des(i - 1)) / (2 * st);            % Central difference
+                a_des(i) = (v_des(i + 1) - v_des(i - 1)) / (2 * st);        % Central difference
             end
-    
+
             % Calculate feedforward force
-            f = M * a_des - m * g * theta_des;
-%             f = M * a_des;
-%             f = M * ac' - m * g * theta_des;
-%             f = M * ac';
+            if ver == "rigid body"
+
+                f = M * a_des;
+
+            elseif ver == "no impedance"
+
+                % Get desired ball trajectory
+                theta_des = deg2rad(int_mdl_output(:, 2));
+
+                % Compute feedforward force
+                f = M * a_des - m * g * theta_des;
+
+            elseif ver == "full"
+
+                % Get desired ball trajectory
+                theta_des = deg2rad(int_mdl_output(:, 2));
+
+                % Compute feedforward force
+                f = M * a_des - m * g * theta_des;
+
+                % DEBUG
+    %             disp('Simulating feedforward response!')
+    %             disp("Size of xc: ")
+    %             disp(size(xc))
+    %             disp("Size of vc: ")
+    %             disp(size(vc))
     
-            % Calculate system control input including feedforward force
-            u = (1 / k * f') + (b / k * vc) + xc ;
+                % DEBUG
+    %             figure();
+    %             plot(tc, u)
+    %             title("Internal model input")
+    % 
+    %             figure();
+    %             plot(tc, xc)
+    %             title("Convolved position")
+    % 
+    %             figure();
+    %             plot(tc, vc)
+    %             title("Convolved velocity")
+    % 
+    %             figure();
+    %             plot(tc, int_mdl_output(:,1))
+    %             title("Internal simulated cart position")
+    % 
+    %             figure();
+    %             plot(tc, int_mdl_output(:,2))
+    %             title("Internal simulated ball angle")
+    % 
+    %             figure();
+    %             plot(tc, int_mdl_output(:,3))
+    %             title("Internal simulated cart velocity")
+    % 
+    %             figure();
+    %             plot(tc, int_mdl_output(:,4))
+    %             title("Internal simulated ball angular velocity")
+    % 
+    %             disp("Internal system: ")
+    %             internal_sys
+
+            end
 
             % DEBUG
 %             disp("Input w/ feedforward force dims: ")
 %             size(u)
+        else
+
+            % If not using feedforward force, set f to zero vector
+            f = zeros(length(vc), 1);
+
         end
 
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % Calculate system control input 
+        u = (1 / k * f') + (b / k * vc) + xc;
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % (iv): Simulate system response
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
         if simVersion == "linear"
             % Simulate linearized system

@@ -71,10 +71,11 @@ function [val, gradient] = objFunc(x,optimizationType,ampMod,...
     end
 
     % Create physical system model with chosen parameters. "print"
-    % input is set to "false" because this will get run every
-    % evaluation in optimization.
+    % input is set to "false" because this will get run every evaluation
+    % in optimization. "ver" parameter is set to "full", because this is
+    % the full multi-mode system being simulated. 
     [sys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
-        sysCreate(b,k,forwardF,ver,impedance,false);
+        sysCreate(b,k,forwardF,"full",impedance,false);                
 
     % Array of large numbers to replace output of solutions that don't
     % meet criteria. Should be passed over by optimization algorithm.

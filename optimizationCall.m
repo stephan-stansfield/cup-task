@@ -8,16 +8,16 @@ clear all
 addpath('data', genpath('experimental data'));
 
 % Max number of evaluations per trial optimization algorithm will compute
-setMaxEval  = 100;
+setMaxEval  = 10000;
 
 % Choose range of experimental trials to fit (trial numbers start at 0)
 numStart    = 0;
-numEnd      = 0;
+numEnd      = 49;
 
 % Choose blocks to loop through. The 11 acceptable subjects 
 % correspond to blocks 1-22. All blocks would be 1 to 28.
 blockStart  = 1;
-blockEnd    = 1;
+blockEnd    = 22;
 
 % Set range of additional duration values to simulate trials before trimming
 delayMin = 0;       % [sec]
@@ -54,23 +54,23 @@ optimizationType = "input shaping 2 impulse impedance";
 %     optimizationType = "submovement";
 
 % Designate type of internal model used for input shaping and feedforward.
-%     ver = "full";
-%     ver = "rigid body";
-    ver = "no impedance";
-%     ver = "slow";
-%     ver = "fast";
+%     intModel = "full";
+%     intModel = "rigid body";
+%     intModel = "no impedance";
+    intModel = "slow";
+%     intModel = "fast";
 
 % Choose if simulation includes time and/or amplitude error
 timeMod = false;
 ampMod  = false;
 
-% Choose if simulated model includes hand impedance
+% Choose if simulated (external) model includes hand impedan
 impedance = true;
 
 % Choose linear, nonlinear, or linear + pendulum lock simulation
-simVersion  = "pendLock";
-%     simVersion  = "linear";
-%     simVersion  = "nonlinear";
+% simVersion  = "pendLock";
+% simVersion  = "linear";
+simVersion  = "nonlinear";
 
 % Designate objective function type
 objective = "RMSE";
@@ -92,12 +92,12 @@ fitMethod = "eachTrial";
 
 % If running multiple iterations in a row, can use counter and if
 % statements to designate desired parameters.
-for setting = 0
+for setting = 8:9
     
     if setting == 1
         % 1. Original input shaping
         optimizationType = "input shaping 2 impulse no impedance";
-        ver         = "";
+        intModel         = "";
         timeMod     = false;
         ampMod      = false;
         impedance   = false;
@@ -108,7 +108,7 @@ for setting = 0
     elseif setting == 2
         % 2. Multi-mode, no FF
         optimizationType = "input shaping 4 impulse";
-        ver         = "";
+        intModel         = "";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -119,7 +119,7 @@ for setting = 0
     elseif setting == 3
         % 3. Slow mode, no FF
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "slow";
+        intModel         = "slow";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -130,7 +130,7 @@ for setting = 0
     elseif setting == 4
         % 4. Fast mode, no FF
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "fast";
+        intModel         = "fast";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -141,7 +141,7 @@ for setting = 0
     elseif setting == 5
         % 5. Rigid body, no FF
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "rigid body";
+        intModel         = "rigid body";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -152,7 +152,7 @@ for setting = 0
     elseif setting == 6
         % 6. No impedance, no FF
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "no impedance";
+        intModel         = "no impedance";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -163,7 +163,7 @@ for setting = 0
     elseif setting == 7
         % 7. Multi-Mode, Feedforward
         optimizationType = "input shaping 4 impulse";
-        ver         = "";
+        intModel         = "";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -174,29 +174,29 @@ for setting = 0
     elseif setting == 8
         % 8. Slow mode, Feedforward
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "slow";
+        intModel         = "slow";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
-        simVersion  = "pendLock";
+        simVersion  = "nonlinear";
         objective = "RMSE";
         forwardF = true;
         
     elseif setting == 9
         % 9. Fast mode, feedforward
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "fast";
+        intModel         = "fast";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
-        simVersion  = "pendLock";
+        simVersion  = "nonlinear";
         objective = "RMSE";
         forwardF = true; 
         
     elseif setting == 10
         % 10. Rigid body simplification, feedforward
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "rigid body";
+        intModel         = "rigid body";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -207,7 +207,7 @@ for setting = 0
     elseif setting == 11
         % 11. No impedance simplification, feedforward
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "no impedance";
+        intModel         = "no impedance";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -219,7 +219,7 @@ for setting = 0
     elseif setting == 12
         % 12. Original input shaping, feature-based objective
         optimizationType = "input shaping 2 impulse no impedance";
-        ver         = "";
+        intModel         = "";
         timeMod     = false;
         ampMod      = false;
         impedance   = false;
@@ -230,7 +230,7 @@ for setting = 0
     elseif setting == 13
         % 13. Multi-Mode, Feedforward, feature-based objective
         optimizationType = "input shaping 4 impulse";
-        ver         = "";
+        intModel         = "";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -241,7 +241,7 @@ for setting = 0
     elseif setting == 14
         % 14. No impedance simplification, feedforward, feature-based objective
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "no impedance";
+        intModel         = "no impedance";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -252,7 +252,7 @@ for setting = 0
     elseif setting == 15
         % 15. Rigid body simplification, feedforward, feature-based objective
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "rigid body";
+        intModel         = "rigid body";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -263,7 +263,7 @@ for setting = 0
     elseif setting == 16
         % 16. Slow mode, Feedforward, feature-based objective
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "slow";
+        intModel         = "slow";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -274,7 +274,7 @@ for setting = 0
     elseif setting == 17
         % 17. Fast mode, feedforward, feature-based objective
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "fast";
+        intModel         = "fast";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -285,7 +285,7 @@ for setting = 0
     elseif setting == 18
         % 18. Multi-mode, no FF, feature-based objective
         optimizationType = "input shaping 4 impulse";
-        ver         = "";
+        intModel         = "";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -296,7 +296,7 @@ for setting = 0
     elseif setting == 19
         % 19. No impedance, no FF, feature-based objective
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "no impedance";
+        intModel         = "no impedance";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -307,7 +307,7 @@ for setting = 0
     elseif setting == 20
         % 20. Rigid body, no FF, feature-based objective
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "rigid body";
+        intModel         = "rigid body";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -318,7 +318,7 @@ for setting = 0
     elseif setting == 21
         % 21. Slow mode, no FF, feature-based objective
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "slow";
+        intModel         = "slow";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -329,7 +329,7 @@ for setting = 0
     elseif setting == 22
         % 22. Fast mode, no FF, feature-based objective
         optimizationType = "input shaping 2 impulse impedance";
-        ver         = "fast";
+        intModel         = "fast";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -340,7 +340,7 @@ for setting = 0
     elseif setting == 23
         % 23. Submovement Input, No Impedance
         optimizationType = "submovement";
-        ver         = "";
+        intModel         = "";
         timeMod     = false;
         ampMod      = false;
         impedance   = false;
@@ -351,7 +351,7 @@ for setting = 0
     elseif setting == 24
         % 24. Submovement Input, Impedance, Forward F
         optimizationType = "submovement";
-        ver         = "";
+        intModel         = "";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -362,7 +362,7 @@ for setting = 0
     elseif setting == 25
         % 25. Submovement Input, Impedance, No Forward F
         optimizationType = "submovement";
-        ver         = "";
+        intModel         = "";
         timeMod     = false;
         ampMod      = false;
         impedance   = true;
@@ -408,13 +408,13 @@ for setting = 0
         fString = 'No Feedforward F';
     end
     
-    if ver == "rigid body"
+    if intModel == "rigid body"
         mString = ', Rigid Body I.S. Simplification';
-    elseif ver == "no impedance"
+    elseif intModel == "no impedance"
         mString = ', No Impedance I.S. Simplification';
-    elseif ver == "slow"
+    elseif intModel == "slow"
         mString = ', Slow Mode I.S. Simplification';
-    elseif ver == "fast"
+    elseif intModel == "fast"
         mString = ', Fast Mode I.S. Simplification';
     else
         mString = '';
@@ -436,14 +436,14 @@ for setting = 0
         % Selects type of fitting (per trial versus per block)
         if fitEachTrial
             optimization(blockNum,optimizationType,modelStr,...
-                forwardF,timeMod,ampMod,ver,impedance,simVersion,...
+                forwardF,timeMod,ampMod,intModel,impedance,simVersion,...
                 objective,weights,delayMin,delayMax,plotInd,printDes,...
                 printSys,plotSim,plotPeaks,setMaxEval,numStart,...
                 numEnd,fitMethod)
 
         else
             optimization_block_20210106(subjStr,trialDate,trialStr,blockStr,...
-                blockNum,optimizationType,modelStr,forwardF,timeMod,ampMod,ver)
+                blockNum,optimizationType,modelStr,forwardF,timeMod,ampMod,intModel)
         end
 
         % Close all windows at the end of running a block (practically

@@ -1,5 +1,5 @@
 function [val, gradient] = objFunc(x,optimizationType,ampMod,...
-        forwardF,ver,impedance,tc,tdes,delayMin,delayMax,xEnd,vStart,vEnd,...
+        forwardF,intModel,impedance,tc,tdes,delayMin,delayMax,xEnd,vStart,vEnd,...
         st,shift,simVersion,pendIndex,objective,pos,vel,...
         acc,theta,omega,alpha,weights,blockStr,blockNum,subjNum,num,tDesMax,fitMethod)
     
@@ -70,12 +70,11 @@ function [val, gradient] = objFunc(x,optimizationType,ampMod,...
         tdelay  = x(6);
     end
 
-    % Create physical system model with chosen parameters. "print"
-    % input is set to "false" because this will get run every evaluation
-    % in optimization. "ver" parameter is set to "full", because this is
-    % the full multi-mode system being simulated. 
-    [sys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
-        sysCreate(b,k,forwardF,"full",impedance,false);                
+    % Create external system model with chosen parameters.
+    % - "print" input is set to "false" because this will get run every 
+    % evaluation in optimization
+    [extSys,intSys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
+        sysCreate(b,k,forwardF,intModel,impedance,false);                
 
     % Array of large numbers to replace output of solutions that don't
     % meet criteria. Should be passed over by optimization algorithm.
@@ -88,49 +87,47 @@ function [val, gradient] = objFunc(x,optimizationType,ampMod,...
 
     % If system is not overdamped, simulate motion using given inputs
     if optimizationType == "input shaping 4 impulse"
+
         if overdamped
             output = nullarray;
         else
+
             modes = 2;
-            [output, ~, ~, ~, ~] = simInputShape(b,k,ver,sys,...
-                sysRigid,Td1,Td2,zeta1,zeta2,tdes,tdessim,xEnd,vStart,...
-                vEnd,fa11,fa12,fa21,fa22,p,q,r,s,st,shift,forwardF,...
-                simVersion,modes,pendIndex,fitMethod);
+            [output, ~, ~, ~, ~] = simInputShape(b, k, intModel, extSys, ...
+                sysRigid, Td1, Td2, zeta1, zeta2, tdes, tdessim, xEnd, ...
+                vStart, vEnd, st, shift, forwardF, simVersion, modes, ...
+                pendIndex, fitMethod);
+
         end
 
     elseif optimizationType == "input shaping 2 impulse impedance"
+        
         if overdamped
+
             output = nullarray;
+
         else
-            modes   = 1;
-            Td2     = 0;
-            zeta2   = 0;
-            fa21    = 0;
-            fa22    = 0;
-            r       = 0;
-            s       = 0;
-            [output, ~, ~, ~, ~] = simInputShape(b,k,ver,sys,...
-                sysRigid,Td,Td2,zeta,zeta2,tdes,tdessim,xEnd,vStart,vEnd,...
-                fa1,fa2,fa21,fa22,p,q,r,s,st,shift,forwardF,simVersion,...
-                modes,pendIndex,fitMethod);
+
+            modes = 1;
+            [output, ~, ~, ~, ~] = simInputShape(b, k, intModel, extSys, ...
+                sysRigid, Td, Td2, zeta, zeta2, tdes, tdessim, xEnd, ...
+                vStart, vEnd, st, shift, forwardF, simVersion, modes, ...
+                pendIndex, fitMethod);
         end
 
     elseif optimizationType == "input shaping 2 impulse no impedance"
+
         modes   = 1;
-        Td2     = 0;
-        zeta2   = 0;
-        fa21    = 0;
-        fa22    = 0;
-        r       = 0;
-        s       = 0;
-        [output, ~, ~, ~, ~] = simInputShape(b,k,ver,sys,sysRigid,...
-            Td,Td2,zeta,zeta2,tdes,tdessim,xEnd,vStart,vEnd,fa1,fa2,fa21,...
-            fa22,p,q,r,s,st,shift,forwardF,simVersion,modes,pendIndex,...
+        [output, ~, ~, ~, ~] = simInputShape(b, k, intModel, extSys, ...
+            sysRigid, Td, Td2, zeta, zeta2, tdes, tdessim, xEnd, vStart, ...
+            vEnd, st, shift, forwardF, simVersion, modes, pendIndex, ...
             fitMethod);
 
     elseif optimizationType == "submovement"
-        [output, ~] = simSubmovements(sys,sysRigid,tdes,tdessim,st,xEnd,...
+
+        [output, ~] = simSubmovements(extSys,sysRigid,tdes,tdessim,st,xEnd,...
         vStart,D1,tf1,ti2,pendIndex,simVersion,forwardF,impedance);
+
     end
 
     % Now that motion was simulated, calculate objective function value

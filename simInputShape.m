@@ -6,10 +6,10 @@
 % underdamped (0 < zeta < 1), the impulses will be asymmetrical. If the
 % system is critically or overdamped (zeta >= 1), input shaping will not work.
 
-function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,sys,...
-        sysRigid,Td1,Td2,zeta1,zeta2,tExp,tDesSim,xEnd,vStart,vEnd,fa11,...
-        fa12,fa21,fa22,p,q,r,s,st,shift,forwardF,simVersion,modes,...
-        pendIndex,fitMethod)
+function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b, ...
+        k, intModel, extSys, sysRigid, Td1, Td2, zeta1, zeta2, tExp, ...
+        tDesSim, xEnd, vStart, vEnd, st, shift, forwardF, simVersion, ...
+        modes, pendIndex, fitMethod)
 
     G = globalData();
     m = G.m;
@@ -32,19 +32,21 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
         return
     end
              
-    % Add amount of time that was trimmed to pendulum release time
+    % Add amount of time that was trimmed from start to pendulum release time
     pendIndex = pendIndex + startIndex;
     
     % Simulate again with lengthened duration
     [output, ~, vcOut, sub1End, sub2Start, dur_corr] = sim();
     
     function [output, startIndex, vcOut, sub1End, sub2Start, dur_corr] = sim()
+
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % (i): Generate Input Shaping impulses
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
         % 1 mode (2 input shaping impulses)
         if modes == 1
+
             % Generate impulse times
             t1 = 0;                                                            
             t2 = Td1 / 2;
@@ -78,7 +80,8 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
             pulsetimes = find(pulses);                                      % Get indices of pulses
             pulses = pulses(1:pulsetimes(end));                             % Trim trailing zeros from vector of pulses
         
-        else % 2 modes (4 input shaping impulses)
+        % 2 modes (4 input shaping impulses)
+        elseif modes == 2 
             % Generate impulse times
             t1 = 0;                                                         % Set t1 to t=0 for both modes
             t21 = Td1 / 2;                                                  % Second impulse for first mode
@@ -162,8 +165,8 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
             lenPulses = length(pulsetimes);
             sub1End = 99;
             sub2Start = 99;
-            disp('sub1End & sub2Start not assigned!')
-            disp(' ')
+%             disp('sub1End & sub2Start not assigned!')
+%             disp(' ')
         end
         % END DELETE %%
 
@@ -215,20 +218,69 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
             % the inverse dynamics
 
             % Create dynamic system of internal model
-            [internal_sys,~,~,~,~,~,~,~,~] = sysCreate(b, k, forwardF, ver, true, false);
+            [~,intSys,~,~,~,~,~,~,~,~] = sysCreate(b, k, forwardF, intModel, true, false);
 
-            % Choose shaped input by internal model
-            if ver == "rigid body"
+            % Choose input structure by internal model
+            if intModel == "full" || intModel == "rigid body"
+
                 u = (b / k * vc) + xc ;
+            
+            elseif intModel == "no impedance"
 
-            elseif ver == "no impedance"
                 u = ac;
+
+            elseif intModel == "slow" || intModel == "fast"
+
+                [w, z] = damp(intSys);
+
+                if intModel == "slow"
+
+                    [omega, min_ind] = min(w(w > 0));
+                    zeta_temp = z(w > 0);
+                    zeta = zeta_temp(min_ind);
+                    m_mod = M;
+
+%                     % DEBUG
+%                     disp('In simInputShape')
+%                     w
+%                     z
+%                     min_ind
+%                     omega
+%                     zeta
+
+                elseif intModel == "fast"
+                    
+                    [omega, max_ind] = max(w(w > 0));
+                    zeta_temp = z(w > 0);
+                    zeta = zeta_temp(max_ind);
+                    m_mod = m;
+
+%                     % DEBUG
+%                     disp('In simInputShape')
+%                     w
+%                     z
+%                     max_ind
+%                     omega
+%                     zeta
+
+                end
+
+                k_mod = m_mod * omega ^ 2;
+                b_mod = 2 * m_mod * zeta * omega;
+
+%                 % DEBUG
+%                 k_mod
+%                 b_mod
+
+                u = (b_mod / k_mod * vc) + xc ;
+
             end
 
             % Simulate response of internal model when given shaped input
-            int_mdl_output = lsim(internal_sys, u, tc);
+            int_mdl_output = lsim(intSys, u, tc);
 
-            % Get desired velocity profile
+            % Get desired velocity profile (output of internal model
+            % simulation)
             v_des = int_mdl_output(:, 3);
 
             % Differentiate desired velocity to get desired acceleration 
@@ -239,26 +291,36 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
                 a_des(i) = (v_des(i + 1) - v_des(i - 1)) / (2 * st);        % Central difference
             end
 
-            % Calculate feedforward force
-            if ver == "rigid body"
+            % Calculate feedforward force depending on internal model
+            if intModel == "full"
+
+                % Get desired ball trajectory
+                theta_des = deg2rad(int_mdl_output(:, 2));
+
+                % Compute feedforward force
+                f = M * a_des - m * g * theta_des;
+            
+            elseif intModel == "rigid body"
+
+                f = (m + M) * a_des;
+
+            elseif intModel == "no impedance"
+
+                % Get desired ball trajectory
+                theta_des = deg2rad(int_mdl_output(:, 2));
+
+                % Compute feedforward force
+                f = M * a_des - m * g * theta_des;
+
+            elseif intModel == "slow"
 
                 f = M * a_des;
 
-            elseif ver == "no impedance"
+            elseif intModel == "fast"
 
-                % Get desired ball trajectory
-                theta_des = deg2rad(int_mdl_output(:, 2));
+                f = m * a_des;
 
-                % Compute feedforward force
-                f = M * a_des - m * g * theta_des;
-
-            elseif ver == "full"
-
-                % Get desired ball trajectory
-                theta_des = deg2rad(int_mdl_output(:, 2));
-
-                % Compute feedforward force
-                f = M * a_des - m * g * theta_des;
+            end
 
                 % DEBUG
     %             disp('Simulating feedforward response!')
@@ -297,9 +359,7 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
     %             title("Internal simulated ball angular velocity")
     % 
     %             disp("Internal system: ")
-    %             internal_sys
-
-            end
+    %             intSys
 
             % DEBUG
 %             disp("Input w/ feedforward force dims: ")
@@ -311,7 +371,7 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
 
         end
 
-        % Calculate system control input 
+        % Calculate control input to actual (external) system
         u = (1 / k * f') + (b / k * vc) + xc;
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -319,8 +379,9 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
         if simVersion == "linear"
+            
             % Simulate linearized system
-            output  = lsim(sys, u, tc);
+            output  = lsim(extSys, u, tc);
  
             % Assign outputs to variables
             pos_sim     = output(:, 1);
@@ -329,7 +390,7 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
             omega_sim   = output(:, 4);
 
         % Simulate system with pendlulum lock bug
-        elseif simVersion == "pendLock"
+        elseif simVersion == "pendLock" || simVersion == "nonlinear"
             
             % Reject profiles that end before the pendulum is released
             if pendIndex >= lentc
@@ -352,41 +413,48 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
             t2 = tc(pendIndex+1:end)-tc(pendIndex+1);                       % Shift value so first t = 0
             u2 = u(pendIndex+1:end);
 
-            % DEBUG
+%             % DEBUG
 %             disp("sizes of t1, u1, t2, u2: ")
 %             size(t1)
 %             size(u1)
 %             size(t2)
 %             size(u2)
 
+%             if linearity == "linear"
+
             % Simulate rigid-body system for first portion of movement
             output1 = lsim(sysRigid, u1, t1);
 
+%             elseif linearity == "nonlinear"
+% 
+%                 % Simulate system of nonlinear equations
+%                 ic = zeros(4,1);    % initial conditions
+%                 [~,output] = ode45(@(t,y) nonlinSysEqns(t,y,u,tc,b,k), tc, ic);
+%     
+%                 % Assign outputs to variables
+%                 pos_sim     = output(:,1);
+%                 theta_sim   = output(:,2);
+%                 vel_sim     = output(:,3);
+%                 omega_sim   = output(:,4);
+% 
+%             end
+
             % Capture values at end of first section to use as initial
             % condition input to second section
-            if forwardF
-%                 if length(output1(1, :)) ~= 4
-% 
-%                     X0 = [output1(end,5), output1(end,1),...                % xdes, x,
-%                         output1(end,2)*2*pi/360, vc(pendIndex), ...         % theta (rad), xdes_dot = vc,
-%                         output1(end,3), output1(end,4)*2*pi/360];           % x_dot, theta_dot (rad/s)
-%                 else
-                    X0 = output1(end, :);
-%                     X0 = [output1(end, 1);                                  % x
-%                           output1(end, 2);                                  % theta (rad)
-%                           output1(end, 3);                                  % x_dot
-%                           output1(end, 4)];                                 % theta_dot (rad/s)
-%                 end
-            else
-%                 X0 = [output1(end,5), output1(end,1),...                    % xdes, x,
-%                     output1(end,2)*2*pi/360, vc(pendIndex),...              % theta (rad), xdes_dot = vc,
-%                     output1(end,3), output1(end,4)*2*pi/360];               % x_dot, theta_dot (rad/s)
-            end
+            X0 = output1(end, :);
 
             % When pendulum is released, simulate full system for the
             % remainder of the move duration. Use values at end of previous
             % simulation as initial conditions for this simulation
-            output2 = lsim(sys, u2, t2, X0);
+            if simVersion == "pendLock"
+
+                output2 = lsim(extSys, u2, t2, X0);
+
+            elseif simVersion == "nonlinear"
+                
+                [~,output2] = ode45(@(t, y) nonlinSysEqns(t, y, u2, t2, b, k), t2, X0);
+                
+            end
 
             % Concatenate outputs
             output = [output1;
@@ -398,17 +466,30 @@ function [output, vcOut, sub1End, sub2Start, dur_corr] = simInputShape(b,k,ver,s
             vel_sim     = output(:, 3);
             omega_sim   = output(:, 4);
 
-        elseif simVersion == "nonlinear"
-            % Simulate system of nonlinear equations
-            ic = zeros(6,1);
-            [~,output] = ode45(@(t,y) nonlinSysEqns(t,y,u,tc,b,k), tc, ic);
-
-            % Assign outputs to variables
-            pos_sim     = output(:,2);
-            theta_sim   = output(:,3);
-            vel_sim     = output(:,5);
-            omega_sim   = output(:,6);
         end
+
+%         elseif simVersion == "nonlinear"
+%             % Simulate system of nonlinear equations
+%             ic = zeros(6,1);
+%             [~,output] = ode45(@(t,y) nonlinSysEqns(t,y,u,tc,b,k), tc, ic);
+% 
+%             % Assign outputs to variables
+%             pos_sim     = output(:,2);
+%             theta_sim   = output(:,3);
+%             vel_sim     = output(:,5);
+%             omega_sim   = output(:,6);
+% 
+%             % Simulate system of nonlinear equations
+%             ic = zeros(4,1);    % initial conditions
+%             [~,output] = ode45(@(t,y) nonlinSysEqns(t,y,u,tc,b,k), tc, ic);
+% 
+%             % Assign outputs to variables
+%             pos_sim     = output(:,1);
+%             theta_sim   = output(:,2);
+%             vel_sim     = output(:,3);
+%             omega_sim   = output(:,4);
+% 
+%         end
 
         % Take approximative derivative of cart velocity to get cart
         % acceleration profile. Take central difference at all interior points,

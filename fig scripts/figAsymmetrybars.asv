@@ -1,0 +1,93 @@
+% figAsymmetrybars
+%
+% Create a figure displaying the mean of median peak ratios for different 
+% simulation types as well as error bars
+
+% C = readcell('data analysis/peak ratio results overall.xlsx');
+C = readcell('data analysis/peak ratio results FF only 2022-11-03.xlsx');
+
+x = C(1,2:end);                 % x-axis labels
+u = cell2mat(C(2,2:end));       % mean of median peak ratios
+s = cell2mat(C(3,2:end));       % standard deviations of median peak ratios
+
+X = categorical(x,x);
+
+expMean = 1.13;
+expStd = 0.16;
+
+% li = expMean*ones(1,14);
+% ys = [0:1:13];
+
+% Plot settings
+titleFontSize = 26;
+labelFontSize = 24;
+axisFontSize = 16;
+marSz = 100;                    % Size of scatter plot markers
+green = [0.4660 0.6740 0.1880]; % MATLAB default green
+markerList = [  "x",...         % Human subject data
+                "diamond",...   % Multi-Mode internal model
+                "v",...         % Slow mode internal model
+                "^",...         % Fast mode internal model
+                "square",...    % Rigid body internal model (hand impedance mode)
+                "o"];           % No impedance internal model (pendulum mode)
+
+figure();
+markerObjects{1} = scatter(X(1),u(1),200,'Marker',markerList(1),...
+        'MarkerEdgeColor',"k",'MarkerFaceColor',"k",'LineWidth',1.5);
+hold on;
+errorbar(X(1), u(1), s(1), 'Color',"k",'LineStyle','none','LineWidth',2);
+
+rectX = [0.75, 6.25]
+plot(rectX,[1, 1],'LineStyle','--','Color','black','LineWidth',1.5);          % 1 (no asymmetry) as dashed line
+plot(rectX,[expMean, expMean],'LineStyle','-','Color','black','LineWidth',1.5); % experimental mean of medians as solid line
+
+
+for i = 2:length(X)
+    markerObjects{i} = scatter(X(i),u(i),marSz,'Marker',markerList(i),...
+        'MarkerEdgeColor',green,'MarkerFaceColor',green);
+    hold on;
+    errorbar(X(i), u(i), s(i), 'Color',green,'LineStyle','none','LineWidth',2);
+end
+% hold on;
+% errorbar(X, u, s, 'Color',green,'LineStyle','none');
+% DEBUG
+a = gca
+% axPos = get(gca,'Position')
+% xlim = get(gca,'xlim');
+
+% rectangle('Position',[0,expMean-expStd,15,2*expStd],'FaceColor', [220 220 220]/255,...
+%     'EdgeColor', [1 1 1])
+% rectangle('Position',[xlim(1),expMean-expStd,axPos(3),2*expStd],'FaceColor', [220 220 220]/255,...
+%     'EdgeColor', [1 1 1])
+% rectangle('Position',[0,expMean-expStd,5,2*expStd],'FaceColor', [220 220 220]/255,...
+%     'EdgeColor', [1 1 1])
+% rectX = xlim
+
+% rectX = [0.75, 6.25]
+
+% rectY = expMean + expStd*[1 -1]
+% patch(rectX([1,2,2,1]), rectY([1,1,2,2]),'k', ...
+%     'EdgeColor', 'none', 'FaceAlpha', 0.2);
+
+% plot(rectX,[1, 1],'LineStyle','--','Color','black','LineWidth',1.5);          % 1 (no asymmetry) as dashed line
+
+% plot(rectX,[expMean, expMean],'LineStyle','-','Color','black','LineWidth',2); % experimental mean of medians as solid line
+% errorbar(X, u, s,'Color',green,'LineStyle','none','LineWidth',2);
+% hold on;
+% for i = 1:length(X)
+%     scatter(X(i),u(i),marSz,'Marker',markerList(i),...
+%         'MarkerEdgeColor',green,'MarkerFaceColor',green);
+% end
+% scatter(X,u,'filled');
+set(gca,'FontSize',axisFontSize)
+title('Peak Ratio by Simulation Type','FontSize',titleFontSize,'FontWeight','Normal');
+xlabel('Simulation  Type','FontSize',labelFontSize);
+ylabel('Mean of Median Peak Ratios','FontSize',labelFontSize);
+set(gca,'xticklabel',[]) % Don't show data labels on x-axis; put in legend instead
+
+legend([markerObjects{1} markerObjects{2} markerObjects{3} markerObjects{4},...
+    markerObjects{5} markerObjects{6}], x(1:6),...
+    'Location','southeast','FontSize',legendFontSize)
+
+
+

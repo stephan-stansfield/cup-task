@@ -1,9 +1,30 @@
 function folder = simulationFolder(count)
        
-    % 1. Original Input Shaping (No Impedance Model)
+    % 1. Original Input Shaping (No Impedance External Model)
     if count == 1
         folder = '01. Original Input Shaping'
+        
+    % 2. Multi-Mode Input Shaping with FF:
+    elseif count == 2
+        folder = '02. Multi-Mode Internal Model With Feedforward'
+        
+    % 3. Slow Mode IS with FF:
+    elseif count == 3
+        folder = '03. Slow Mode Internal Model With Feedforward'
+        
+    % 4. Fast Mode IS with FF:
+    elseif count == 4
+        folder = '04. Fast Mode Internal Model With Feedforward'
     
+    % 5. Rigid Body IS with FF:
+    elseif count == 5
+        folder = '05. Rigid Body Internal Model With Feedforward'
+    
+    % 6. No-Impedance IS with FF:
+    elseif count == 6
+        folder = '06. No-Impedance Internal Model With Feedforward'   
+        
+        %{
     % 2. Multi-Mode Input Shaping, no FF:
     elseif count == 2
         folder = '02. Multi-Mode Internal Model Without Feedforward'
@@ -23,29 +44,11 @@ function folder = simulationFolder(count)
     % 6. No-Impedance IS, no FF:
     elseif count == 6
         folder = '06. No-Impedance Internal Model Without Feedforward'
-        
-    % 7. Multi-Mode Input Shaping with FF:
-    elseif count == 7
-        folder = '07. Multi-Mode Internal Model With Feedforward'
-        
-    % 8. Slow-Mode IS with FF:
-    elseif count == 8
-        folder = '08. Slow-Mode Internal Model With Feedforward'
-        
-    % 9. Fast-Mode IS with FF:
-    elseif count == 9
-        folder = '09. Fast-Mode Internal Model With Feedforward'
-    
-    % 10. Rigid-Body IS with FF:
-    elseif count == 10
-        folder = '10. Rigid-Body Internal Model With Feedforward'
-    
-    % 11. No-Impedance IS with FF:
-    elseif count == 11
-        folder = '11. No-Impedance Internal Model With Feedforward'    
-        
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %}
 
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%{
     % 12. Submovements, No Impedance
     elseif count == 12
         folder = '12. Submovements, No Impedance'
@@ -132,6 +135,7 @@ function folder = simulationFolder(count)
     elseif count == 35
         folder = '35. Rigid Body Simplification, Feedforward, B=7.5-75, K=25-250, +250ms delay'
         
+%}
     % 99. Experimental Trajectories
     elseif count == 99
         % For experimental trajectories folder name doesn't matter. This is

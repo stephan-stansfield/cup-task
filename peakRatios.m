@@ -13,7 +13,7 @@ clc;
 %%%% SETTINGS
 %%%% Settings: simulation type, block numbers, and trial numbers to analyze
 % Choose range of simulation types to analyze
-simStart = 1;
+simStart = 7;
 simEnd = 11;
 
 % Choose which experimental blocks to analyze (all acceptable blocks
@@ -52,6 +52,7 @@ medianRatio = nan(simEnd,blockEnd/2);
 simLabels = {'IS', 'MM-NF', 'SM-NF', 'FM-NF', 'RB-NF', 'NI-NF', ...
     'MM-FF', 'SM-FF', 'FM-FF', 'RB-FF', 'NI-FF'};
 
+%{
 % Create table to hold median peak ratio values for each subject within a
 % simulation
 medianBySubject = nan(simEnd,blockEnd/2);
@@ -66,6 +67,7 @@ statsByBlock(1,2:end) = {'S1_B3', 'S1_B4', 'S2_B3', 'S2_B4', 'S3_B3',...
     'S3_B4', 'S4_B3', 'S4_B4', 'S5_B3', 'S5_B4', 'S6_B3', 'S6_B4',...
     'S7_B3', 'S7_B4', 'S8_B3', 'S8_B4', 'S9_B3', 'S9_B4', 'S10_B3',...
     'S10_B4', 'S11_B3', 'S11_B4'};
+%}
 
 % Create table to hold overall mean, median, and standard deviation values
 % of velocity peak ratios for all simulations analyzed
@@ -106,7 +108,7 @@ for simNum = simStart:simEnd
         block3or4 = blockNumFunc(blockNum);
     
         % Folder holding best-fit trials from current block
-        if(isfolder(strcat("best fit simulation/",parentFolder,"S1_B3")))
+        if(isfolder(strcat("best fit simulation/",parentFolder,"S10_B3")))
             % Folders named by subject number & block number
             simFolder = strcat("best fit simulation/",parentFolder,subjNum,"_B",block3or4);
         else
@@ -225,15 +227,15 @@ for simNum = simStart:simEnd
     tail = 'both';
 %     [h5,p5,ci,stats] = ttest(cell2mat(medianBySubject(simNum+1,:)),1,...
 %         'Tail',tail)
-    [h5,p5,ci,stats] = ttest(medianBySubject(simNum+1,:),1,'Tail',tail)
+    [h5,p5,ci,stats] = ttest(medianBySubject(simNum,:),1,'Tail',tail)
     
 %     [h2,p2,ci,stats] = ttest(cell2mat(medianBySubject(simNum+1,:)),1,...
 %         'Tail',tail,'Alpha',.02)
-    [h2,p2,ci,stats] = ttest(medianBySubject(simNum+1,:),1,'Tail',tail,'Alpha',.02)
+    [h2,p2,ci,stats] = ttest(medianBySubject(simNum,:),1,'Tail',tail,'Alpha',.02)
 
 %     [h1,p1,ci,stats] = ttest(cell2mat(medianBySubject(simNum+1,:)),1,...
 %         'Tail',tail,'Alpha',.01)
-    [h1,p1,ci,stats] = ttest(medianBySubject(simNum+1,:),1,'Tail',tail,'Alpha',.01)
+    [h1,p1,ci,stats] = ttest(medianBySubject(simNum,:),1,'Tail',tail,'Alpha',.01)
 
     % Calculate t-value manually for sanity check
 %     manualT = (mean(cell2mat(medianBySubject(2:end,simNum+1))) - 1)/...
@@ -247,8 +249,8 @@ for simNum = simStart:simEnd
         std(velRatio(:,:,simNum),1,'all','omitnan');...
 %         mean(cell2mat(medianBySubject(simNum+1,:)));...
 %         std(cell2mat(medianBySubject(simNum+1,:)),1,'all','omitnan');...
-        mean(medianBySubject(simNum+1,:));...
-        std(medianBySubject(simNum+1,:),1,'all','omitnan');...
+        mean(medianBySubject(simNum,:));...
+        std(medianBySubject(simNum,:),1,'all','omitnan');...
         h5; p5; h2; p2; h1; p1};
     
 end

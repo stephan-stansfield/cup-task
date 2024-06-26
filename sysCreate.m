@@ -1,5 +1,5 @@
 function [extSys,intSys,sysRigid,Td,Td1,Td2,zeta,zeta1,zeta2,overdamped] = ...
-        sysCreate(b,k,forwardF,intModel,impedance,printSys)
+        sysCreate(b,k,intModel,impedance,printSys)
 % SYSCREATE
 % Creates a linear state-space system of the form:
 %   dx = A*x + B*u

@@ -1,5 +1,4 @@
-function val = objCalc(objective,output,pos,theta,vel,omega,acc,alpha,...
-        weights,blockStr,blockNum,subjNum,num)
+function val = objCalc(output,pos,theta,vel,omega,acc,alpha,weights)
 % OBJCALC
 %
 % Calculates the weighted root mean square error between simulated and

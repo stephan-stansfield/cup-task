@@ -40,12 +40,12 @@ function optimization(blockNum,optimizationType,modelStr,forwardF,intModel,...
 % stiffness in N/m, st is simulation time step in seconds, and tDesMax is 
 % initialized to 0. Note that constants for gravity, and physical system
 % mass and length are defined in globalData.m)
-Bmin        = 0;
-Bmax        = 100;
-Kmin        = 0;
-Kmax        = 1000;
-st          = 0.001;
-tDesMax     = 0;
+Bmin = 0;
+Bmax = 100;
+Kmin = 0;
+Kmax = 1000;
+st = 0.001;
+tDesMax = 0;
 
 % Choose optimization algorithm (uncomment desired algorithm)
 % Controlled Random Search (CRS) with local mutation:
@@ -65,7 +65,7 @@ algorithm = NLOPT_GN_CRS2_LM;
     
 % Run main program for selected experimental block and simulation settings
 % Get information about experimental block
-[subjNum, subjStr, trialDate, trialStr, blockStr, ~, ~,invalidTrials] = ...
+[subjNum, subjStr, trialDate, trialStr, blockStr,~,~,~] = ...
     blockDictionary(blockNum);
 disp('Experimental Block: ')
 disp([subjStr,trialDate,trialStr,blockStr])
@@ -141,12 +141,11 @@ wAlpha  = weights(6);
 % optimization parameter values
 numParams   = 15;
 numRows = max(numTrials,numParams);
-if optimizationType == "input shaping 4 impulse"
-    numCols = 18;
-elseif optimizationType == "input shaping 2 impulse impedance"
-    numCols = 14;
+if optimizationType == "input shaping 4 impulse" || ...
+        optimizationType == "input shaping 2 impulse impedance"
+    numCols = 6;
 elseif optimizationType == "input shaping 2 impulse no impedance"
-    numCols = 12;
+    numCols = 4;
 end
 returnArray = NaN(numRows,numCols);
     
@@ -200,8 +199,8 @@ relative_stop = 0.00001;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % NLopt Function %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    function [xopt, fmin] = NLopt(tc, tdes, xEnd, vStart, pendIndex,...
-        pos, vel, acc, theta, omega, alpha, num, algorithm, setMaxEval)
+function [xopt, fmin] = NLopt(tc, tdes, xEnd, vStart, pendIndex, pos, vel,...
+        acc, theta, omega, alpha, algorithm, setMaxEval)
 
     % Set optimization algorithm
     opt.algorithm = algorithm;
@@ -223,8 +222,7 @@ relative_stop = 0.00001;
     % Objective function to be minimized
     opt.min_objective = @(x) objFunc(x, optimizationType,forwardF,intModel,...
         impedance,tc,tdes,delayMin,delayMax,xEnd,vStart,st,simVersion,...
-        pendIndex,objective,pos,vel,acc,theta,omega,alpha,weights,blockStr,...
-        blockNum,subjNum,num);
+        pendIndex,pos,vel,acc,theta,omega,alpha,weights);
 
     % Stopping criteria: stop optimization when an evaluation step
     % changes every component of x by less than xtol_rel multiplied by the
@@ -292,7 +290,7 @@ parfor num = numStart:numEnd
 
     %%% Run optimization. Fit values to selected experimental trial.
     [xopt, fmin] = feval(NLoptHandle,tc,tdes,xEnd,vStart,pendIndex,pos,vel,...
-        acc,theta,omega,alpha,num,algorithm,setMaxEval);
+        acc,theta,omega,alpha,algorithm,setMaxEval);
 
     % Store best-fit parameters and objective function value in array 
     % to be accessed outside parfor-loop
@@ -315,6 +313,8 @@ for num = numStart:numEnd
         optK = xopt(2);
         optTcount = xopt(3);
     elseif optimizationType == "input shaping 2 impulse no impedance"
+        optB = 0;
+        optK = 0;
         optTcount   = xopt(1);
     end
 
@@ -350,8 +350,8 @@ for num = numStart:numEnd
     tdessim = tdes + optTdelay;
     
     % Create system using optimal hyperparameters
-    [extSys, intSys, sysRigid, Td, Td1, Td2, zeta, zeta1, zeta2, overdamped] = ...
-        sysCreate(optB, optK, forwardF, intModel, impedance, printSys);
+    [extSys, ~, sysRigid, Td, Td1, Td2, zeta, zeta1, zeta2, ~] = ...
+        sysCreate(optB, optK, intModel, impedance, printSys);
 
     if printSys
         % Output damping ratios and damped natural periods
@@ -366,19 +366,17 @@ for num = numStart:numEnd
     % Simulate system with optimized parameters
     if optimizationType == "input shaping 4 impulse"
         modes = 2;
-        [output, vc, sub1End, sub2Start, dur_corr] = simInputShape(optB, ...
-            optK, intModel, extSys, sysRigid, Td1, Td2, zeta1, zeta2, tdes, ...
-            tdessim, xEnd, vStart, st, forwardF, simVersion, ...
-            modes, pendIndex, impedance);
+        [output, dur_corr, vc] = simInputShape(optB, optK, intModel, extSys,...
+            sysRigid, Td1, Td2, zeta1, zeta2, tdes, tdessim, xEnd, vStart,...
+            st, forwardF, simVersion, modes, pendIndex, impedance);
     elseif optimizationType == "input shaping 2 impulse impedance" || ...
             optimizationType == "input shaping 2 impulse no impedance"
-        modes   = 1;
-        Td2     = 0;
-        zeta2   = 0;
-        [output, vc, sub1End, sub2Start, dur_corr] = simInputShape(optB, ...
-            optK, intModel, extSys, sysRigid, Td, Td2, zeta, zeta2, tdes, ...
-            tdessim, xEnd, vStart, st, forwardF, simVersion, ...
-            modes, pendIndex, impedance);
+        modes = 1;
+        Td2 = 0;
+        zeta2 = 0;
+        [output, dur_corr, vc] = simInputShape(optB, optK, intModel, extSys,...
+            sysRigid, Td, Td2, zeta, zeta2, tdes, tdessim, xEnd, vStart,...
+            st, forwardF, simVersion, modes, pendIndex, impedance);
     end
     
     if plotPeaks
@@ -431,15 +429,11 @@ for num = numStart:numEnd
     trial = num + 1;
 
     % Fill array with best-fit optimization parameters
-    if optimizationType == "input shaping 4 impulse"
-        returnArray(returnRow,:) = [trial, fmin, vrmse, optB, optK,...
-            optTdelay, 0, relative_stop];
-    elseif optimizationType == "input shaping 2 impulse impedance"
-        returnArray(returnRow,:) = [trial, fmin, vrmse, optB, optK,...
-            optTdelay, 0, relative_stop];
+    if optimizationType == "input shaping 4 impulse" ||...
+           optimizationType == "input shaping 2 impulse impedance" 
+        returnArray(returnRow,:) = [trial,fmin,vrmse,optB,optK,optTdelay];
     elseif optimizationType == "input shaping 2 impulse no impedance"
-        returnArray(returnRow,:) = [trial, fmin, vrmse, ...
-            optTdelay, 0, relative_stop];
+        returnArray(returnRow,:) = [trial,fmin,vrmse,optTdelay];
     end
     
     % Save best-fit output to a spreadsheet    
@@ -640,6 +634,8 @@ Bbounds = strcat("B bounds: ",convertCharsToStrings(num2str(Bmin))," to ",...
                     convertCharsToStrings(num2str(Bmax)));
 Kbounds = strcat("K bounds: ",convertCharsToStrings(num2str(Kmin))," to ",...
                     convertCharsToStrings(num2str(Kmax)));
+stopTol = strcat("Stopping tolerance: ",...
+    convertCharsToStrings(num2str(relative_stop)));
 durationtime = strcat("Max duration error: ",...
                     convertCharsToStrings(num2str(delayMax*1000))," ms");
 setMaxEval = strcat("Eval max: ",...
@@ -664,8 +660,9 @@ paramTable{1,1} = blocknameStr;
 paramTable{3,1} = algorithm;
 paramTable{4,1} = Bbounds;
 paramTable{5,1} = Kbounds;
-paramTable{8,1} = durationtime;
-paramTable{9,1} = setMaxEval;
+paramTable{6,1} = durationtime;
+paramTable{7,1} = setMaxEval;
+paramTable{8,1} = stopTol;
 paramTable{10,1} = wPosStr;
 paramTable{11,1} = wThetaStr;
 paramTable{12,1} = wVelStr;
@@ -685,15 +682,11 @@ elseif optimizationType == "input shaping 2 impulse no impedance"
 end 
 
 % Convert array to table
-if optimizationType == "input shaping 4 impulse"
-    variableNames = {'Trial','Fmin','VRMSE','B','K','Tdelay','Evaluations',...
-        'Stop Tolerance %'};
-elseif optimizationType == "input shaping 2 impulse impedance"
-    variableNames = {'Trial','Fmin','VRMSE','B','K','Tdelay','Evaluations',...
-        'Stop Tolerance %'};
+if optimizationType == "input shaping 4 impulse" || ...
+        optimizationType == "input shaping 2 impulse impedance"
+    variableNames = {'Trial','Fmin','VRMSE','B','K','Tdelay'};
 elseif optimizationType == "input shaping 2 impulse no impedance"
-    variableNames = {'Trial','Fmin','VRMSE','Tdelay','Evaluations',...
-        'Stop Tolerance %'};
+    variableNames = {'Trial','Fmin','VRMSE','Tdelay'};
 end
 returnTable = array2table(returnArray,'VariableNames',variableNames);
 
@@ -732,7 +725,7 @@ end
 % Save tables to excel file
 fileName = strcat(folderStr, nameStr, ".xlsx");
 writetable(T,fileName);
-writetable(AnalysisT,fileName,'Range','U1:BB6');
+writetable(AnalysisT,fileName,'Range','I1:N6');
 
 % Save just data without headings to a .mat file
 save(strcat(topFolderStr, num2str(blockNum), ".mat"), "returnArray");

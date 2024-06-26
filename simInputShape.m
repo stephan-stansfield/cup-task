@@ -1,5 +1,5 @@
-function [output, dur_corr] = simInputShape(b,k,intModel,extSys,sysRigid,...
-        Td1,Td2,zeta1,zeta2,tExp,tDesSim,xEnd,vStart,st,forwardF,...
+function [output, dur_corr, vc] = simInputShape(b,k,intModel,extSys,...
+        sysRigid,Td1,Td2,zeta1,zeta2,tExp,tDesSim,xEnd,vStart,st,forwardF,...
         simVersion,modes,pendIndex,impedance)
 % SIMINPUTSHAPE
 %
@@ -161,8 +161,8 @@ function [output, dur_corr] = simInputShape(b,k,intModel,extSys,sysRigid,...
             % "desired" trajectory in the inverse dynamics
 
             % Create dynamic system of internal model
-            [~,intSys,~,~,~,~,~,~,~,~] = sysCreate(b, k, forwardF,...
-                intModel, impedance, false);
+            [~,intSys,~,~,~,~,~,~,~,~] = sysCreate(b, k, intModel,...
+                impedance, false);
 
             % Choose input by internal model
             if intModel == "full" || intModel == "rigid body"
@@ -207,18 +207,13 @@ function [output, dur_corr] = simInputShape(b,k,intModel,extSys,sysRigid,...
             end
 
             % Calculate feedforward force depending on internal model
-            if intModel == "full"
+            if intModel == "full" || intModel == "no impedance"
                 % Get desired ball angle trajectory (rad) and compute
                 % feedforward force
                 theta_des = int_mdl_output(:, 2);
                 f = M * a_des - m * g * theta_des;
             elseif intModel == "rigid body"
                 f = (m + M) * a_des;
-            elseif intModel == "no impedance"
-                % Get desired ball angle trajectory (rad) and compute
-                % feedforward force
-                theta_des = int_mdl_output(:, 2);
-                f = M * a_des - m * g * theta_des;
             elseif intModel == "slow"
                 f = M * a_des;
             elseif intModel == "fast"
@@ -226,6 +221,8 @@ function [output, dur_corr] = simInputShape(b,k,intModel,extSys,sysRigid,...
             end
         else
             % If not using feedforward force, set f to zero vector
+            x_des = xc';
+            v_des = vc';
             f = zeros(length(vc), 1);
         end
 
@@ -366,7 +363,7 @@ function [output, dur_corr] = simInputShape(b,k,intModel,extSys,sysRigid,...
         end
         
         % Re-assign trimmed kinematic profiles to output array
-        output = [pos_sim, theta_sim, vel_sim, omega_sim, acc_sim, alpha_sim];
+        output = [pos_sim,theta_sim,vel_sim,omega_sim,acc_sim,alpha_sim];
         
     end
 

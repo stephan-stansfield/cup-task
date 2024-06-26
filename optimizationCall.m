@@ -10,7 +10,7 @@ clear
 addpath('data', genpath('experimental data'));
 
 % Max number of evaluations per trial optimization algorithm will compute
-maxEval  = 10000;
+maxEval  = 10;
 
 % Choose range of experimental trials to fit (trial numbers start at 0)
 numStart    = 0;
@@ -19,7 +19,7 @@ numEnd      = 49;
 % Choose blocks to loop through. The "testing blocks" 3 and 4 for all 11 
 % subjects correspond to blocks 1-22
 blockStart  = 1;
-blockEnd    = 22;
+blockEnd    = 2;
 
 % Set range of additional duration (in seconds) to add to simulated trials
 % before trimming to start and stop thresholds
@@ -78,7 +78,7 @@ forwardF = true;
 
 % If running multiple iterations in a row, can use counter and if
 % statements to designate desired parameters
-for setting = 1:11
+for setting = 11
     
     if setting == 1
         % 1. Nominal input shaping without hand impedance
@@ -89,15 +89,15 @@ for setting = 1:11
         forwardF = true;
 
     elseif setting == 2
-        % 2. Multi-mode, no feedforward force
+        % 2. Multi-mode internal model, no feedforward force
         optimizationType = "input shaping 4 impulse";
-        intModel = "";
+        intModel = "full";
         impedance = true;
         simVersion  = "nonlinear";
         forwardF = false;
 
     elseif setting == 3
-        % 3. Slow mode, no feedforward force
+        % 3. Slow mode internal model, no feedforward force
         optimizationType = "input shaping 2 impulse impedance";
         intModel = "slow";
         impedance = true;
@@ -105,7 +105,7 @@ for setting = 1:11
         forwardF = false;
 
     elseif setting == 4
-        % 4. Fast mode, no feedforward force
+        % 4. Fast mode internal model, no feedforward force
         optimizationType = "input shaping 2 impulse impedance";
         intModel = "fast";
         impedance = true;
@@ -113,7 +113,7 @@ for setting = 1:11
         forwardF = false;
 
     elseif setting == 5
-        % 5. Rigid body, no feedforward force
+        % 5. Rigid body internal model, no feedforward force
         optimizationType = "input shaping 2 impulse impedance";
         intModel = "rigid body";
         impedance = true;
@@ -121,7 +121,7 @@ for setting = 1:11
         forwardF = false;
         
     elseif setting == 6
-        % 6. No impedance, no feedforward force
+        % 6. No impedance internal model, no feedforward force
         optimizationType = "input shaping 2 impulse impedance";
         intModel = "no impedance";
         impedance = true;
@@ -129,15 +129,15 @@ for setting = 1:11
         forwardF = false;
         
     elseif setting == 7
-        % 7. Multi-Mode, feedforward force
+        % 7. Multi-Mode internal model, feedforward force
         optimizationType = "input shaping 4 impulse";
-        intModel = "";
+        intModel = "full";
         impedance   = true;
         simVersion = "nonlinear";
         forwardF = true;
 
     elseif setting == 8
-        % 8. Slow mode, feedforward force
+        % 8. Slow mode internal model, feedforward force
         optimizationType = "input shaping 2 impulse impedance";
         intModel = "slow";
         impedance = true;
@@ -145,15 +145,15 @@ for setting = 1:11
         forwardF = true;
         
     elseif setting == 9
-        % 9. Fast mode, feedforward force
+        % 9. Fast mode internal model, feedforward force
         optimizationType = "input shaping 2 impulse impedance";
         intModel = "fast";
         impedance = true;
         simVersion = "nonlinear";
         forwardF = true; 
-        
-    elseif setting == 10
-        % 10. Rigid body simplification, feedforward force
+
+        elseif setting == 10
+        % 10. Rigid body internal model, feedforward force
         optimizationType = "input shaping 2 impulse impedance";
         intModel = "rigid body";
         impedance = true;
@@ -161,12 +161,14 @@ for setting = 1:11
         forwardF = true;          
         
     elseif setting == 11
-        % 11. No impedance simplification, feedforward force
+        % 11. No impedance internal model, feedforward force
         optimizationType = "input shaping 2 impulse impedance";
         intModel = "no impedance";
         impedance = true;
         simVersion = "nonlinear";
         forwardF = true;
+        
+    
     end
             
     % Start timing total code execution time
@@ -230,24 +232,17 @@ for setting = 1:11
     % Write data from all blocks into a single spreadsheet
     filename = strcat(topFolderStr,modelType,".xlsx");
     
-    if optimizationType == "input shaping 4 impulse"
-        variableNames = {'Trial','Fmin','VRMSE','B','K','Impulse1','Impulse2',...
-                        'Impulse3','Impulse4','Tdelay','Amp11','Amp12','Amp21',...
-                        'Amp22','Sub1End','Sub2Start'};
-    elseif optimizationType == "input shaping 2 impulse impedance"
-        variableNames = {'Trial','Fmin','VRMSE','B','K','Impulse1','Impulse2',...
-                        'Tdelay','Amp1','Amp2','Sub1End','Sub2Start'};
+    if optimizationType == "input shaping 4 impulse" ||...
+            optimizationType == "input shaping 2 impulse impedance"
+        variableNames = {'Trial','Fmin','VRMSE','B','K','Tdelay'};
     elseif optimizationType == "input shaping 2 impulse no impedance"
-        variableNames = {'Trial','Fmin','VRMSE','Impulse1','Impulse2',...
-                        'Tdelay','Amp1','Amp2','Sub1End','Sub2Start'};
-    elseif optimizationType == "submovement"
-        variableNames = {'Trial','Fmin','VRMSE','B','K','Dist1',...
-                        'Submovement 1 end','Submovement 2 start','Tdelay'};
+        variableNames = {'Trial','Fmin','VRMSE','Tdelay'};
     end
     
     % Write headers to spreadsheet
     writecell(variableNames,filename,'Sheet',1)
     
+    % Load data for each block and write to spreadsheet
     for  blockNum = blockStart:1:blockEnd
         load(strcat(topFolderStr, num2str(blockNum), ".mat"),"returnArray");
         if plotInd

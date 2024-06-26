@@ -10,7 +10,7 @@ clear
 addpath('data', genpath('experimental data'));
 
 % Max number of evaluations per trial optimization algorithm will compute
-maxEval  = 10;
+maxEval  = 10000;
 
 % Choose range of experimental trials to fit (trial numbers start at 0)
 numStart    = 0;
@@ -19,7 +19,7 @@ numEnd      = 49;
 % Choose blocks to loop through. The "testing blocks" 3 and 4 for all 11 
 % subjects correspond to blocks 1-22
 blockStart  = 1;
-blockEnd    = 2;
+blockEnd    = 22;
 
 % Set range of additional duration (in seconds) to add to simulated trials
 % before trimming to start and stop thresholds
@@ -78,7 +78,7 @@ forwardF = true;
 
 % If running multiple iterations in a row, can use counter and if
 % statements to designate desired parameters
-for setting = 11
+for setting = 1:11
     
     if setting == 1
         % 1. Nominal input shaping without hand impedance
@@ -167,7 +167,6 @@ for setting = 11
         impedance = true;
         simVersion = "nonlinear";
         forwardF = true;
-        
     
     end
             
